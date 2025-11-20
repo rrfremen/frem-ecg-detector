@@ -15,8 +15,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QFrame, QGridLayout, QSizePolicy,
-    QWidget)
+from PySide6.QtWidgets import (QApplication, QGridLayout, QSizePolicy, QWidget)
 
 class Ui_Form(object):
     def setupUi(self, Form):
@@ -32,13 +31,6 @@ class Ui_Form(object):
         self.gridLayout.setObjectName(u"gridLayout")
         self.gridLayout_2 = QGridLayout()
         self.gridLayout_2.setObjectName(u"gridLayout_2")
-        self.frame_placeholder = QFrame(Form)
-        self.frame_placeholder.setObjectName(u"frame_placeholder")
-        self.frame_placeholder.setFrameShape(QFrame.Shape.StyledPanel)
-        self.frame_placeholder.setFrameShadow(QFrame.Shadow.Raised)
-
-        self.gridLayout_2.addWidget(self.frame_placeholder, 0, 0, 1, 1)
-
 
         self.gridLayout.addLayout(self.gridLayout_2, 0, 0, 1, 1)
 

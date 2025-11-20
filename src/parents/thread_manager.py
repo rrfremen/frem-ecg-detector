@@ -3,6 +3,7 @@ from threading import Thread
 from collections import deque
 from multiprocessing import Event, Lock
 import time
+from functools import partial
 
 
 class ThreadManager:
@@ -34,12 +35,13 @@ class ThreadManager:
             else:
                 with self.thread_queue_lock:
                     current_func = self.thread_queue.popleft()
-                    current_func()
-                    # save results for logging eventually
+                current_func()
+                # print(f'{self.thread.name} finished a task')
+                # save results for logging eventually
 
-    def add_worker(self, func):
+    def add_worker(self, func, **kwargs):
         with self.thread_queue_lock:
-            self.thread_queue.append(func)
+            self.thread_queue.append(partial(func, **kwargs))
 
 
 # TODO: eventually combine all parents class into one script for readability
