@@ -74,10 +74,10 @@ class Ui_Form(object):
 
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.pushButton_run = QPushButton(Form)
-        self.pushButton_run.setObjectName(u"pushButton_run")
+        self.pushButton_start = QPushButton(Form)
+        self.pushButton_start.setObjectName(u"pushButton_start")
 
-        self.horizontalLayout.addWidget(self.pushButton_run)
+        self.horizontalLayout.addWidget(self.pushButton_start)
 
         self.pushButton_stop = QPushButton(Form)
         self.pushButton_stop.setObjectName(u"pushButton_stop")
@@ -110,7 +110,7 @@ class Ui_Form(object):
         self.pushButton_selectFile.setText(QCoreApplication.translate("Form", u"Select File", None))
         self.pushButton_selectFolder.setText(QCoreApplication.translate("Form", u"Select Folder", None))
         self.pushButton_clearSelection.setText(QCoreApplication.translate("Form", u"Clear Selection", None))
-        self.pushButton_run.setText(QCoreApplication.translate("Form", u"Run", None))
+        self.pushButton_start.setText(QCoreApplication.translate("Form", u"Start", None))
         self.pushButton_stop.setText(QCoreApplication.translate("Form", u"Stop", None))
         self.pushButton_settings.setText(QCoreApplication.translate("Form", u"Settings", None))
     # retranslateUi

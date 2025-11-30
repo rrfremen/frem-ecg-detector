@@ -5,5 +5,8 @@
     "fs": 0,
     "units": []
   },
-  "algorithm": {}
+  "algorithm": {},
+  "display": {
+    "refresh_rate": 0
+  }
 }

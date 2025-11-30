@@ -15,11 +15,11 @@ from parents.thread_manager import ThreadManager
 class ControllerWidget(QWidget, ThreadManager, Ui_Form):
     className = 'ControllerWidget'
 
-    def __init__(self, controller_funcs):
+    def __init__(self, controller_vars):
         super().__init__()
         self.setupUi(self)
         self.setup_ui_local()
-        self.setup_signal(controller_funcs)
+        self.setup_signal(controller_vars)
 
         # shared variables
         self.config = self.get_config()
@@ -28,7 +28,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.error_txt = ''
 
     # setup functions
-    def setup_signal(self, controller_funcs):
+    def setup_signal(self, controller_vars):
         # internal signals
         self.pushButton_selectFile.clicked.connect(
             self.select_file
@@ -39,16 +39,20 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.pushButton_clearSelection.clicked.connect(
             self.clear_recs_selection
         )
+        self.pushButton_start.clicked.connect(
+            self.start_live_plot
+        )
 
         # external signals
-        self.central_config_lock = controller_funcs['central_config_lock']
-        self.get_config = controller_funcs['get_config']
-        self.overwrite_config = controller_funcs['overwrite_config']
-        self.signal_display_recs = controller_funcs['display_recs']
+        self.central_config_lock = controller_vars['central_config_lock']
+        self.get_config = controller_vars['get_config']
+        self.overwrite_config = controller_vars['overwrite_config']
+        self.signal_display_recs = controller_vars['display_recs']
+        self.signal_start_live_plot = controller_vars['start_live_plot']
 
     def setup_ui_local(self):
         # grey out buttons first
-        self.pushButton_run.setDisabled(True)
+        self.pushButton_start.setDisabled(True)
         self.pushButton_stop.setDisabled(True)
         self.pushButton_settings.setDisabled(True)
 
@@ -62,7 +66,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         )
 
         if selected_files:
-            self.add_worker(self.check_selected_files, file_paths=selected_files[0])
+            self.add_worker(self.tw_check_selected_files, file_paths=selected_files[0])
 
     def select_folder(self):
         selected_folder = QFileDialog.getExistingDirectory(
@@ -72,13 +76,16 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         )
 
         if selected_folder:
-            self.add_worker(self.check_selected_files, file_paths=selected_folder)
+            self.add_worker(self.tw_check_selected_files, file_paths=selected_folder)
 
     def clear_recs_selection(self):
         pass
 
+    def start_live_plot(self):
+        self.add_worker(self.tw_start_live_plot)
+
     # thread worker functions
-    def check_selected_files(self, file_paths):
+    def tw_check_selected_files(self, file_paths):
         if type(file_paths) is str:  # folder
             file_paths = glob.glob(os.path.join(file_paths, '*.dat'))
             if not file_paths:
@@ -125,6 +132,14 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
 
         self.signal_display_recs.emit()
 
+    def tw_start_live_plot(self):
+        # check stuff first
+        print('starting live plot')
+        self.signal_start_live_plot.emit()
+
     # Controller GUI functions - Only use from main_script for centralization
     def update_gui_file_selection(self):
         self.listWidget_fileSelection.addItems(self.config['recordings']['paths'])
+        self.pushButton_start.setDisabled(False)
+        self.pushButton_stop.setDisabled(False)
+        self.pushButton_settings.setDisabled(False)

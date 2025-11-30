@@ -87,9 +87,9 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QPushButton" name="pushButton_run">
+        <widget class="QPushButton" name="pushButton_start">
          <property name="text">
-          <string>Run</string>
+          <string>Start</string>
          </property>
         </widget>
        </item>
