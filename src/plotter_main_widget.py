@@ -33,36 +33,36 @@ class PlotterMainWidget(QWidget, Ui_Form):
     # setup functions
     def setup_local_ui(self):
         # FigureCanvas for main window
-        self.figure_top = Figure()
-        self.canvas_top = FigureCanvas(self.figure_top)
-        self.plot_top = self.figure_top.add_subplot(111)
-        self.plot_top.set_visible(False)
+        self.figure_upper = Figure()
+        self.canvas_upper = FigureCanvas(self.figure_upper)
+        self.plot_upper = self.figure_upper.add_subplot(111)
+        self.plot_upper.set_visible(False)
 
-        self.figure_bottom = Figure()
-        self.canvas_bottom = FigureCanvas(self.figure_bottom)
-        self.plot_bottom = self.figure_bottom.add_subplot(111)
+        self.figure_lower = Figure()
+        self.canvas_lower = FigureCanvas(self.figure_lower)
+        self.plot_lower = self.figure_lower.add_subplot(111)
 
-        self.gridLayout_2.addWidget(self.canvas_top)
-        # self.gridLayout_2.addWidget(self.canvas_bottom)
+        self.gridLayout_2.addWidget(self.canvas_upper)
+        # self.gridLayout_2.addWidget(self.canvas_lower)
 
     def setup_signal(self, plotter_main_vars):
         pass
 
     # Main Plotter GUI functions - Only use from main_script for centralization
     def update_first_plot(self):
-        # self.gridLayout_2.removeWidget(self.canvas_bottom)
-        # self.canvas_bottom.setParent(None)
-        self.plot_top.set_visible(True)
+        # self.gridLayout_2.removeWidget(self.canvas_lower)
+        # self.canvas_lower.setParent(None)
+        self.plot_upper.set_visible(True)
         window = 10
         first_path = self.config['recordings']['paths'][0]
         signal = wfdb.rdsamp(first_path)[0][:window*self.config['recordings']['fs'], 0]
         time_index = np.arange(len(signal)) / self.config['recordings']['fs']
-        self.plot_top.plot(time_index, signal)
-        self.plot_top.grid()
-        self.plot_top.set_xlabel('Time in s')
-        self.plot_top.set_ylabel('Amplitude in mV')
-        self.canvas_top.draw()
+        self.plot_upper.plot(time_index, signal)
+        self.plot_upper.grid()
+        self.plot_upper.set_xlabel('Time in s')
+        self.plot_upper.set_ylabel('Amplitude in mV')
+        self.canvas_upper.draw()
 
     # internal functions
     def start_plotting(self):
-        self.canvas_top.draw()
+        self.canvas_upper.draw()

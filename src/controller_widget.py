@@ -40,15 +40,15 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
             self.clear_recs_selection
         )
         self.pushButton_start.clicked.connect(
-            self.start_live_plot
+            self.live_plot_start
         )
 
         # external signals
-        self.central_config_lock = controller_vars['central_config_lock']
+        self.lock_central_config = controller_vars['lock_central_config']
         self.get_config = controller_vars['get_config']
         self.overwrite_config = controller_vars['overwrite_config']
         self.signal_display_recs = controller_vars['display_recs']
-        self.signal_start_live_plot = controller_vars['start_live_plot']
+        self.signal_live_plot_start = controller_vars['signal_live_plot_start']
 
     def setup_ui_local(self):
         # grey out buttons first
@@ -81,8 +81,8 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
     def clear_recs_selection(self):
         pass
 
-    def start_live_plot(self):
-        self.add_worker(self.tw_start_live_plot)
+    def live_plot_start(self):
+        self.add_worker(self.tw_live_plot_start)
 
     # thread worker functions
     def tw_check_selected_files(self, file_paths):
@@ -121,7 +121,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
                 final_file_paths.append(current_path)
 
         # update config - recordings
-        with self.central_config_lock:
+        with self.lock_central_config:
             self.config['recordings'].update({
                 'paths': final_file_paths,
                 'sig_name': relevant_headers[0],
@@ -132,10 +132,10 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
 
         self.signal_display_recs.emit()
 
-    def tw_start_live_plot(self):
+    def tw_live_plot_start(self):
         # check stuff first
         print('starting live plot')
-        self.signal_start_live_plot.emit()
+        self.signal_live_plot_start.emit()
 
     # Controller GUI functions - Only use from main_script for centralization
     def update_gui_file_selection(self):

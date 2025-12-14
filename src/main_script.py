@@ -1,13 +1,13 @@
 # internal
 import sys
-from multiprocessing import Lock, Process, Pipe
+from multiprocessing import Lock, Process, Pipe, Event
 from threading import Thread
 import json
 
 # external
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QApplication, QSizePolicy
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QTimer
 
 # private
 from controller_widget import ControllerWidget
@@ -20,10 +20,11 @@ from algorithms.processing_pipeline import ProcessingPipeline
 class MainWindow(QMainWindow, ThreadManager):
     className = "MainWindow"
 
-    central_config_lock = Lock()
+    lock_central_config = Lock()
     signal_display_recs = Signal()
-    signal_start_live_plot = Signal()
-    signal_update_live_plot = Signal()
+    signal_live_plot_start = Signal()
+    signal_live_plot_stop = Signal()
+    event_live_plot = Event()
 
     def __init__(self):
         super().__init__()
@@ -39,12 +40,13 @@ class MainWindow(QMainWindow, ThreadManager):
         # widgets
         controller_vars = {
             # config
-            'central_config_lock': self.central_config_lock,
+            'lock_central_config': self.lock_central_config,
             'get_config': self.get_config,
             'overwrite_config': self.overwrite_config,
             # signal
             'display_recs': self.signal_display_recs,
-            'start_live_plot': self.signal_start_live_plot
+            'signal_live_plot_start': self.signal_live_plot_start,
+            'signal_live_plot_stop': self.signal_live_plot_stop,
         }
 
         plotter_main_vars = {
@@ -56,6 +58,9 @@ class MainWindow(QMainWindow, ThreadManager):
         self.controller = ControllerWidget(controller_vars)
 
         self.main_children = [self.plotter_main, self.plotter_side, self.controller]
+
+        self.timer_main_plotter = QTimer()
+        self.data_current_main_plotter = []
 
         self.setup_ui_local()
         self.setup_signal()
@@ -94,7 +99,7 @@ class MainWindow(QMainWindow, ThreadManager):
 
     def setup_signal(self):
         self.signal_display_recs.connect(self.display_recs)
-        self.signal_start_live_plot.connect(self.start_live_plot)
+        self.signal_live_plot_start.connect(self.live_plot_start)
 
     # config functions
     def get_config(self):
@@ -108,34 +113,58 @@ class MainWindow(QMainWindow, ThreadManager):
 
     # GUI functions
     def display_recs(self):
-        print('main script received signal')
         self.controller.update_gui_file_selection()
         self.plotter_main.update_first_plot()
 
-    def start_live_plot(self):
+    def live_plot_start(self):
+        # pipe for communication with external process
         pipe_processing, pipe_plotting = Pipe()
-        print('here')
+
+        # start a background thread to monitor incoming data from external process
         thread_pipe_plotting_monitor = Thread(
             name='Thread-Pipe-Plotting-Monitor',
             target=self.pipe_plotting_monitor,
             args=(pipe_plotting,)
         )
+        # start an external process for data processing
         processing_pipeline = ProcessingPipeline(self.config)
         process_processing = Process(
             name='Process-Detector',
             target=processing_pipeline.run,
             args=(pipe_processing,)
         )
+        # start all
+        self.event_live_plot.set()
         process_processing.start()
         thread_pipe_plotting_monitor.start()
 
+        # start a QTimer for updating main plotter
+        # self.timer_main_plotter.setInterval(int(1000/self.config['display']['refresh_rate']))  # refresh rate in ms
+        self.timer_main_plotter.setInterval(5000)
+        self.timer_main_plotter.timeout.connect(self.live_plot_update)
+        self.timer_main_plotter.start()
+
+    def live_plot_update(self):
+        print('update live plot triggered')
+
+    def live_plot_stop(self):
+        pass
+
+    # pipe stuff
     def pipe_plotting_monitor(self, pipe_plotting):
-        print('thread ok')
+        print('monitor - started')
+        while self.event_live_plot.is_set():
+            new_data = pipe_plotting.recv()  # blocking behaviour
+            if type(new_data) in [int, float, list]:
+                self.data_current_main_plotter.append(new_data)
+            elif type(new_data) is None:  # close the pipe
+                self.event_live_plot.clear()
+                pipe_plotting.close()
+            else:
+                print('WARNING - unknown data received')
 
 
 if __name__ == '__main__':
-    # import multiprocessing
-    # multiprocessing.set_start_method('spawn')
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
