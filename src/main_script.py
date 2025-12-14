@@ -20,7 +20,7 @@ from algorithms.processing_pipeline import ProcessingPipeline
 class MainWindow(QMainWindow, ThreadManager):
     className = "MainWindow"
 
-    lock_central_config = Lock()
+    lock_config_global = Lock()
     signal_display_recs = Signal()
     signal_live_plot_start = Signal()
     signal_live_plot_stop = Signal()
@@ -30,17 +30,15 @@ class MainWindow(QMainWindow, ThreadManager):
         super().__init__()
 
         # shared variables
-        with open('central_config.json', 'r') as f:
-            self.config = json.load(f)
-            # get refresh rate of screen
-            self.config['display']['refresh_rate'] = int(QGuiApplication.primaryScreen().refreshRate())
+        with open('config_global.json', 'r') as f:
+            self.config_global = json.load(f)
 
         # local variables
 
         # widgets
         controller_vars = {
             # config
-            'lock_central_config': self.lock_central_config,
+            'lock_config_global': self.lock_config_global,
             'get_config': self.get_config,
             'overwrite_config': self.overwrite_config,
             # signal
@@ -53,8 +51,15 @@ class MainWindow(QMainWindow, ThreadManager):
 
         }
 
+        plotter_side_vars = {
+            # config
+            'lock_config_global': self.lock_config_global,
+            'get_config': self.get_config,
+            'overwrite_config': self.overwrite_config,
+        }
+
         self.plotter_main = PlotterMainWidget(plotter_main_vars)
-        self.plotter_side = PlotterSideWidget()
+        self.plotter_side = PlotterSideWidget(plotter_side_vars)
         self.controller = ControllerWidget(controller_vars)
 
         self.main_children = [self.plotter_main, self.plotter_side, self.controller]
@@ -100,15 +105,16 @@ class MainWindow(QMainWindow, ThreadManager):
     def setup_signal(self):
         self.signal_display_recs.connect(self.display_recs)
         self.signal_live_plot_start.connect(self.live_plot_start)
+        self.signal_live_plot_stop.connect(self.live_plot_stop)
 
     # config functions
     def get_config(self):
-        return self.config
+        return self.config_global
 
     def overwrite_config(self, config):
-        self.config = config
+        self.config_global = config
         for current_child in self.main_children:
-            current_child.config = self.config  # update for all widgets
+            current_child.config_global = self.config_global  # update for all widgets
         print('config updated')
 
     # GUI functions
@@ -127,7 +133,7 @@ class MainWindow(QMainWindow, ThreadManager):
             args=(pipe_plotting,)
         )
         # start an external process for data processing
-        processing_pipeline = ProcessingPipeline(self.config)
+        processing_pipeline = ProcessingPipeline(self.config_global)
         process_processing = Process(
             name='Process-Detector',
             target=processing_pipeline.run,
@@ -139,7 +145,7 @@ class MainWindow(QMainWindow, ThreadManager):
         thread_pipe_plotting_monitor.start()
 
         # start a QTimer for updating main plotter
-        # self.timer_main_plotter.setInterval(int(1000/self.config['display']['refresh_rate']))  # refresh rate in ms
+        # self.timer_main_plotter.setInterval(int(1000/self.config_global['display']['refresh_rate']))  # refresh rate in ms
         self.timer_main_plotter.setInterval(5000)
         self.timer_main_plotter.timeout.connect(self.live_plot_update)
         self.timer_main_plotter.start()
@@ -153,8 +159,14 @@ class MainWindow(QMainWindow, ThreadManager):
     # pipe stuff
     def pipe_plotting_monitor(self, pipe_plotting):
         print('monitor - started')
+        new_data = None
         while self.event_live_plot.is_set():
-            new_data = pipe_plotting.recv()  # blocking behaviour
+            try:
+                new_data = pipe_plotting.recv()  # blocking behaviour
+            except EOFError:
+                print('WARNING - processing pipe was closed unexpectedly')
+            else:
+                pass
             if type(new_data) in [int, float, list]:
                 self.data_current_main_plotter.append(new_data)
             elif type(new_data) is None:  # close the pipe

@@ -19,9 +19,11 @@ class PlotterMainWidget(QWidget, Ui_Form):
         self.setup_signal(plotter_main_vars)
 
         # shared variables
-        self.config = None
+        self.config_global = None
 
         # local variables
+        self.data_current_main_plotter = []
+        self.plot_window = 10
 
         # self.ax = self.figure.add_subplot(111)
         # self.x_data = np.arange(0, 2*np.pi, 0.1)
@@ -41,6 +43,7 @@ class PlotterMainWidget(QWidget, Ui_Form):
         self.figure_lower = Figure()
         self.canvas_lower = FigureCanvas(self.figure_lower)
         self.plot_lower = self.figure_lower.add_subplot(111)
+        self.plot_lower.set_visible(False)
 
         self.gridLayout_2.addWidget(self.canvas_upper)
         # self.gridLayout_2.addWidget(self.canvas_lower)
@@ -53,10 +56,9 @@ class PlotterMainWidget(QWidget, Ui_Form):
         # self.gridLayout_2.removeWidget(self.canvas_lower)
         # self.canvas_lower.setParent(None)
         self.plot_upper.set_visible(True)
-        window = 10
-        first_path = self.config['recordings']['paths'][0]
-        signal = wfdb.rdsamp(first_path)[0][:window*self.config['recordings']['fs'], 0]
-        time_index = np.arange(len(signal)) / self.config['recordings']['fs']
+        first_path = self.config_global['recordings']['paths'][0]
+        signal = wfdb.rdsamp(first_path)[0][:self.plot_window*self.config_global['recordings']['fs'], 0]
+        time_index = np.arange(len(signal)) / self.config_global['recordings']['fs']
         self.plot_upper.plot(time_index, signal)
         self.plot_upper.grid()
         self.plot_upper.set_xlabel('Time in s')
@@ -64,5 +66,5 @@ class PlotterMainWidget(QWidget, Ui_Form):
         self.canvas_upper.draw()
 
     # internal functions
-    def start_plotting(self):
+    def live_plot_update(self):
         self.canvas_upper.draw()

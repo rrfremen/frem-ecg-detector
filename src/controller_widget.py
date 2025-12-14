@@ -22,7 +22,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.setup_signal(controller_vars)
 
         # shared variables
-        self.config = self.get_config()
+        self.config_global = self.get_config()
 
         # local variables
         self.error_txt = ''
@@ -42,15 +42,20 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.pushButton_start.clicked.connect(
             self.live_plot_start
         )
+        self.pushButton_stop.clicked.connect(
+            self.live_plot_stop
+        )
 
         # external signals
-        self.lock_central_config = controller_vars['lock_central_config']
+        self.lock_config_global = controller_vars['lock_config_global']
         self.get_config = controller_vars['get_config']
         self.overwrite_config = controller_vars['overwrite_config']
         self.signal_display_recs = controller_vars['display_recs']
         self.signal_live_plot_start = controller_vars['signal_live_plot_start']
+        self.signal_live_plot_stop = controller_vars['signal_live_plot_stop']
 
     def setup_ui_local(self):
+        self.pushButton_selectFolder.setDisabled(True)
         # grey out buttons first
         self.pushButton_start.setDisabled(True)
         self.pushButton_stop.setDisabled(True)
@@ -82,7 +87,10 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         pass
 
     def live_plot_start(self):
-        self.add_worker(self.tw_live_plot_start)
+        self.signal_live_plot_start.emit()
+
+    def live_plot_stop(self):
+        self.signal_live_plot_stop.emit()
 
     # thread worker functions
     def tw_check_selected_files(self, file_paths):
@@ -107,7 +115,12 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
                     current_header.units,
                     current_header.samps_per_frame
                 ]
-                final_file_paths.append(current_path)
+                # insist on MLII if explicitly defined in config global file
+                if self.config_global['recordings']['channels_in_use']:
+                    if self.config_global['recordings']['channels_in_use'] in current_header.sig_name:
+                        final_file_paths.append(current_path)
+                    else:
+                        break
             else:  # compare all headers to the first header
                 current_relevant_headers = [
                     current_header.sig_name,
@@ -121,25 +134,20 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
                 final_file_paths.append(current_path)
 
         # update config - recordings
-        with self.lock_central_config:
-            self.config['recordings'].update({
+        with self.lock_config_global:
+            self.config_global['recordings'].update({
                 'paths': final_file_paths,
                 'sig_name': relevant_headers[0],
                 'fs': relevant_headers[1],
                 'units': relevant_headers[2],
             })
-            self.overwrite_config(self.config)
+            self.overwrite_config(self.config_global)
 
         self.signal_display_recs.emit()
 
-    def tw_live_plot_start(self):
-        # check stuff first
-        print('starting live plot')
-        self.signal_live_plot_start.emit()
-
     # Controller GUI functions - Only use from main_script for centralization
     def update_gui_file_selection(self):
-        self.listWidget_fileSelection.addItems(self.config['recordings']['paths'])
+        self.listWidget_fileSelection.addItems(self.config_global['recordings']['paths'])
         self.pushButton_start.setDisabled(False)
         self.pushButton_stop.setDisabled(False)
         self.pushButton_settings.setDisabled(False)

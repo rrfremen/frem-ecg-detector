@@ -2,6 +2,7 @@
   "recordings": {
     "paths": [],
     "sig_name": [],
+    "channels_in_use": ["MLII"],
     "fs": 0,
     "units": []
   },
