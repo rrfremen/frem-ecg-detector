@@ -52,6 +52,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.overwrite_config = controller_vars['overwrite_config']
         self.signal_display_recs = controller_vars['display_recs']
         self.signal_live_plot_start = controller_vars['signal_live_plot_start']
+        self.signal_live_plot_pause = controller_vars['signal_live_plot_pause']
         self.signal_live_plot_stop = controller_vars['signal_live_plot_stop']
 
     def setup_ui_local(self):
@@ -87,7 +88,12 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         pass
 
     def live_plot_start(self):
-        self.signal_live_plot_start.emit()
+        if self.pushButton_start.text() == 'Start':
+            self.signal_live_plot_start.emit()
+            self.pushButton_start.setText('Pause')
+        else:
+            self.signal_live_plot_pause.emit()
+            self.pushButton_start.setText('Start')
 
     def live_plot_stop(self):
         self.signal_live_plot_stop.emit()
@@ -115,12 +121,13 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
                     current_header.units,
                     current_header.samps_per_frame
                 ]
-                # insist on MLII if explicitly defined in config global file
-                if self.config_global['recordings']['channels_in_use']:
-                    if self.config_global['recordings']['channels_in_use'] in current_header.sig_name:
-                        final_file_paths.append(current_path)
-                    else:
-                        break
+                # insist on MLII for now
+                if len(self.config_global['recordings']['channels_in_use']) == 1:
+                    if self.config_global['recordings']['channels_in_use'][0] == 'MLII':
+                        if 'MLII' in current_header.sig_name:
+                            final_file_paths.append(current_path)
+                        else:
+                            break
             else:  # compare all headers to the first header
                 current_relevant_headers = [
                     current_header.sig_name,

@@ -6,7 +6,12 @@
     "fs": 0,
     "units": []
   },
-  "algorithm": {},
+  "preprocessing": {
+    "bandpass_low": 9,
+    "bandpass_high": 14,
+    "avg_window": 120
+  },
+  "detector": {},
   "display": {
     "refresh_rate": 0
   }
