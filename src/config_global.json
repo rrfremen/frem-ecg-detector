@@ -9,9 +9,18 @@
   "preprocessing": {
     "bandpass_low": 9,
     "bandpass_high": 14,
-    "avg_window": 120
+    "avg_window": 120,
+    "shm": {
+      "name": "ecg-shm",
+      "shape": 0,
+      "dtype": "",
+      "data_bytes": 0,
+      "version_bytes": 0
+    }
   },
-  "detector": {},
+  "detector": {
+
+  },
   "display": {
     "refresh_rate": 0
   }

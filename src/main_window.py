@@ -1,11 +1,12 @@
 # internal
-from multiprocessing import Lock, Process, Pipe, Event
+from multiprocessing import Lock, Process, Pipe, Event, shared_memory
 from threading import Thread
 import json
 
 # external
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy
 from PySide6.QtCore import Signal, QTimer
+import numpy as np
 
 # private
 from controller_widget import ControllerWidget
@@ -127,11 +128,39 @@ class MainWindow(QMainWindow, ThreadManager):
         # pipe for communication with external process
         pipe_processing, pipe_plotting = Pipe()
 
+        # internal function for safeguard again shared memory leaks
+        def create_shm(name: str, size: int):
+            # remove if old SHM exists
+            try:
+                old_shm = shared_memory.SharedMemory(name=name, create=False)
+                old_shm.close()
+                old_shm.unlink()
+            except FileNotFoundError:
+                pass
+
+            return shared_memory.SharedMemory(name=name, create=True, size=size)
+
+        # shared memory for data transfer between processes
+        shm_name = 'ecg-shm'
+        shm_shape = (self.config_global['recordings']['fs'],
+                     len(self.config_global['recordings']['channels_in_use'])+2)
+        shm_data_bytes = int(np.prod(shm_shape) * np.dtype(np.float64).itemsize)
+        shm_version_bytes = np.dtype(np.uint64).itemsize
+        shm_raw = create_shm(name=shm_name, size=(shm_data_bytes + shm_version_bytes))
+
+        self.config_global['preprocessing']['shm'].update({
+            'name': shm_name,
+            'shape': shm_shape,
+            'data_bytes': shm_data_bytes,
+            'version_bytes': shm_version_bytes
+        })
+        self.overwrite_config(self.config_global)
+
         # start a background thread to monitor incoming data from external process
         thread_pipe_plotting_monitor = Thread(
             name='Thread-Pipe-Plotting-Monitor',
             target=self.pipe_plotting_monitor,
-            args=(pipe_plotting,)
+            args=(pipe_plotting, shm_raw)
         )
         # start an external process for data processing
         processing_pipeline = ProcessingPipeline(self.config_global)
@@ -145,11 +174,17 @@ class MainWindow(QMainWindow, ThreadManager):
         process_processing.start()
         thread_pipe_plotting_monitor.start()
 
-        # start a QTimer for updating main plotter
-        # self.timer_main_plotter.setInterval(int(1000/self.config_global['display']['refresh_rate']))  # refresh rate in ms
-        self.timer_main_plotter.setInterval(5000)
-        self.timer_main_plotter.timeout.connect(self.live_plot_update)
-        self.timer_main_plotter.start()
+        # unlink shared memory directly now to avoid orphaned memory later
+        processing_handshake = pipe_plotting.recv()
+        if processing_handshake == 'shm_attached':
+            shm_raw.unlink()
+            # self.timer_main_plotter.setInterval(int(1000/self.config_global['display']['refresh_rate']))  # refresh rate in ms
+            self.timer_main_plotter.setInterval(5000)
+            self.timer_main_plotter.timeout.connect(self.live_plot_update)
+            self.timer_main_plotter.start()
+            print('shm succesfully attached to processing pipeline, starting live plot')
+        else:
+            ValueError('processing pipeline gave no handshake')
 
     def live_plot_update(self):
         print('update live plot triggered')
@@ -161,15 +196,31 @@ class MainWindow(QMainWindow, ThreadManager):
         pass
 
     # pipe stuff
-    def pipe_plotting_monitor(self, pipe_plotting):
+    def pipe_plotting_monitor(self, pipe_plotting, shm_raw):
         print('monitor - started')
         new_data = None
+        shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
+        shm_arr = np.ndarray(
+            shape=self.config_global['preprocessing']['shm']['shape'],
+            dtype=np.float64,
+            buffer=shm_raw.buf,
+            offset=self.config_global['preprocessing']['shm']['version_bytes']
+        )
         while self.event_live_plot.is_set():
             try:
                 new_data = pipe_plotting.recv()  # blocking behaviour
-                if type(new_data) in [int, float, list]:
-                    self.data_current_main_plotter.append(new_data)
-                elif type(new_data) is None:  # close the pipe
+                if type(new_data) == str:
+                    if new_data == 'data_available':
+                        for _ in range(3):  # small retry loop
+                            v1 = shm_ver[0]
+                            if v1 & 1:
+                                continue
+                            new_snapshot = shm_arr.copy()
+                            v2 = shm_ver[0]
+                            if v1 == v2 and not (v2 & 1):
+                                self.data_current_main_plotter.append(new_snapshot)
+                                break
+                elif new_data is None:  # close the pipe
                     self.event_live_plot.clear()
                     pipe_plotting.close()
                 else:
