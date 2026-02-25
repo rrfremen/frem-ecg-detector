@@ -24,6 +24,8 @@ class MainWindow(QMainWindow, ThreadManager):
     signal_live_plot_start = Signal()
     signal_live_plot_pause = Signal()
     signal_live_plot_stop = Signal()
+    lock_live_plot_data = Lock()
+    lock_live_plot_monitor = Lock()
     event_live_plot = Event()
 
     def __init__(self):
@@ -66,7 +68,6 @@ class MainWindow(QMainWindow, ThreadManager):
         self.main_children = [self.plotter_main, self.plotter_side, self.controller]
 
         self.timer_main_plotter = QTimer()
-        self.data_current_main_plotter = []
 
         self.setup_ui_local()
         self.setup_signal()
@@ -125,6 +126,8 @@ class MainWindow(QMainWindow, ThreadManager):
         self.plotter_main.update_first_plot()
 
     def live_plot_start(self):
+        # block live monitor to start running directly as a safeguard
+        self.lock_live_plot_monitor.acquire(block=True)
         # pipe for communication with external process
         pipe_processing, pipe_plotting = Pipe()
 
@@ -143,7 +146,7 @@ class MainWindow(QMainWindow, ThreadManager):
         # shared memory for data transfer between processes
         shm_name = 'ecg-shm'
         shm_shape = (self.config_global['recordings']['fs'],
-                     len(self.config_global['recordings']['channels_in_use'])+2)
+                     len(self.config_global['recordings']['channels_in_use'])+3)
         shm_data_bytes = int(np.prod(shm_shape) * np.dtype(np.float64).itemsize)
         shm_version_bytes = np.dtype(np.uint64).itemsize
         shm_raw = create_shm(name=shm_name, size=(shm_data_bytes + shm_version_bytes))
@@ -155,6 +158,7 @@ class MainWindow(QMainWindow, ThreadManager):
             'version_bytes': shm_version_bytes
         })
         self.overwrite_config(self.config_global)
+        self.plotter_main.ring_buffer_setup()
 
         # start a background thread to monitor incoming data from external process
         thread_pipe_plotting_monitor = Thread(
@@ -175,19 +179,23 @@ class MainWindow(QMainWindow, ThreadManager):
         thread_pipe_plotting_monitor.start()
 
         # unlink shared memory directly now to avoid orphaned memory later
+        print('waiting for confirmation from processing pipeline')
         processing_handshake = pipe_plotting.recv()
+        print(f'msg from processing pipeline: {processing_handshake}')
         if processing_handshake == 'shm_attached':
             shm_raw.unlink()
-            # self.timer_main_plotter.setInterval(int(1000/self.config_global['display']['refresh_rate']))  # refresh rate in ms
-            self.timer_main_plotter.setInterval(5000)
+            self.timer_main_plotter.setInterval(int(1000/self.config_global['plotter']['display']['refresh_rate']))  # refresh rate in ms
+            # self.timer_main_plotter.setInterval(5000)
             self.timer_main_plotter.timeout.connect(self.live_plot_update)
             self.timer_main_plotter.start()
+            self.lock_live_plot_monitor.release()
             print('shm succesfully attached to processing pipeline, starting live plot')
         else:
             ValueError('processing pipeline gave no handshake')
 
     def live_plot_update(self):
-        print('update live plot triggered')
+        with self.lock_live_plot_data:
+            self.plotter_main.live_plot_update()
 
     def live_plot_pause(self):
         print('live plot paused')
@@ -206,19 +214,40 @@ class MainWindow(QMainWindow, ThreadManager):
             buffer=shm_raw.buf,
             offset=self.config_global['preprocessing']['shm']['version_bytes']
         )
+        prev_indexes, new_indexes = None, []
+        with self.lock_live_plot_monitor:
+            print('Monitor starting')
         while self.event_live_plot.is_set():
             try:
                 new_data = pipe_plotting.recv()  # blocking behaviour
                 if type(new_data) == str:
                     if new_data == 'data_available':
                         for _ in range(3):  # small retry loop
-                            v1 = shm_ver[0]
+                            v1 = shm_ver[0]  # version check to prevent copying while something is being written
                             if v1 & 1:
                                 continue
                             new_snapshot = shm_arr.copy()
                             v2 = shm_ver[0]
                             if v1 == v2 and not (v2 & 1):
-                                self.data_current_main_plotter.append(new_snapshot)
+                                # get only new data from snapshot and send it to plotter_main_widget
+                                if prev_indexes is not None:
+                                    new_indexes = new_snapshot[:, 0]
+                                    shift_front = int(new_indexes[0] - prev_indexes[0])
+                                    shift_end = int(new_indexes[-1] - prev_indexes[-1])
+                                    if shift_front == 0:  # for the start
+                                        shift_front = shift_end
+                                    if shift_end == 0:
+                                        break
+                                    if shift_front == shift_end and shift_front < self.config_global['recordings']['fs']:
+                                        if shift_front <= self.config_global['recordings']['fs']//2:
+                                            new_data = new_snapshot[-shift_front:, :]
+                                            with self.lock_live_plot_data:
+                                                self.plotter_main.ring_buffer_update(new_data)
+                                    else:
+                                        print('ERROR')
+                                    prev_indexes = new_indexes.copy()
+                                else:
+                                    prev_indexes = new_snapshot[:, 0].copy()
                                 break
                 elif new_data is None:  # close the pipe
                     self.event_live_plot.clear()

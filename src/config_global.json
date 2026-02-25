@@ -21,7 +21,12 @@
   "detector": {
 
   },
-  "display": {
-    "refresh_rate": 0
+  "plotter": {
+    "display": {
+      "refresh_rate": 0
+    },
+    "buffer": {
+      "capacity": 30
+    }
   }
 }

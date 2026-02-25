@@ -45,10 +45,8 @@ class PlotterSideWidget(QWidget, ThreadManager, Ui_Form):
             self.comboBox_refreshRate.setCurrentIndex(index)
 
         with self.lock_config_global:
-            print(int(self.comboBox_refreshRate.currentText()[:-3]))
-            self.config_global['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+            self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
 
     def refresh_rate_update(self):
         with self.lock_config_global:
-            print(int(self.comboBox_refreshRate.currentText()[:-3]))
-            self.config_global['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+            self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
