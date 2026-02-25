@@ -23,6 +23,7 @@ class MainWindow(QMainWindow, ThreadManager):
     signal_display_recs = Signal()
     signal_live_plot_start = Signal()
     signal_live_plot_pause = Signal()
+    signal_live_plot_continue = Signal()
     signal_live_plot_stop = Signal()
     lock_live_plot_data = Lock()
     lock_live_plot_monitor = Lock()
@@ -36,6 +37,7 @@ class MainWindow(QMainWindow, ThreadManager):
             self.config_global = json.load(f)
 
         # local variables
+        self.pipe_processing = None
 
         # widgets
         controller_vars = {
@@ -47,6 +49,7 @@ class MainWindow(QMainWindow, ThreadManager):
             'display_recs': self.signal_display_recs,
             'signal_live_plot_start': self.signal_live_plot_start,
             'signal_live_plot_pause': self.signal_live_plot_pause,
+            'signal_live_plot_continue': self.signal_live_plot_continue,
             'signal_live_plot_stop': self.signal_live_plot_stop,
         }
 
@@ -108,6 +111,7 @@ class MainWindow(QMainWindow, ThreadManager):
         self.signal_display_recs.connect(self.display_recs)
         self.signal_live_plot_start.connect(self.live_plot_start)
         self.signal_live_plot_pause.connect(self.live_plot_pause)
+        self.signal_live_plot_continue.connect(self.live_plot_continue)
         self.signal_live_plot_stop.connect(self.live_plot_stop)
 
     # config functions
@@ -129,7 +133,7 @@ class MainWindow(QMainWindow, ThreadManager):
         # block live monitor to start running directly as a safeguard
         self.lock_live_plot_monitor.acquire(block=True)
         # pipe for communication with external process
-        pipe_processing, pipe_plotting = Pipe()
+        pipe_processing, self.pipe_processing = Pipe()
 
         # internal function for safeguard again shared memory leaks
         def create_shm(name: str, size: int):
@@ -161,10 +165,10 @@ class MainWindow(QMainWindow, ThreadManager):
         self.plotter_main.ring_buffer_setup()
 
         # start a background thread to monitor incoming data from external process
-        thread_pipe_plotting_monitor = Thread(
+        thread_worker_pipe_processing_monitor = Thread(
             name='Thread-Pipe-Plotting-Monitor',
-            target=self.pipe_plotting_monitor,
-            args=(pipe_plotting, shm_raw)
+            target=self.worker_pipe_processing_monitor,
+            args=(self.pipe_processing, shm_raw)
         )
         # start an external process for data processing
         processing_pipeline = ProcessingPipeline(self.config_global)
@@ -176,11 +180,11 @@ class MainWindow(QMainWindow, ThreadManager):
         # start all
         self.event_live_plot.set()
         process_processing.start()
-        thread_pipe_plotting_monitor.start()
+        thread_worker_pipe_processing_monitor.start()
 
         # unlink shared memory directly now to avoid orphaned memory later
         print('waiting for confirmation from processing pipeline')
-        processing_handshake = pipe_plotting.recv()
+        processing_handshake = self.pipe_processing.recv()
         print(f'msg from processing pipeline: {processing_handshake}')
         if processing_handshake == 'shm_attached':
             shm_raw.unlink()
@@ -198,13 +202,16 @@ class MainWindow(QMainWindow, ThreadManager):
             self.plotter_main.live_plot_update()
 
     def live_plot_pause(self):
-        print('live plot paused')
+        self.pipe_processing.send('Pause')
+
+    def live_plot_continue(self):
+        self.pipe_processing.send('Continue')
 
     def live_plot_stop(self):
         pass
 
     # pipe stuff
-    def pipe_plotting_monitor(self, pipe_plotting, shm_raw):
+    def worker_pipe_processing_monitor(self, pipe_plotting, shm_raw):
         print('monitor - started')
         new_data = None
         shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
@@ -231,24 +238,22 @@ class MainWindow(QMainWindow, ThreadManager):
                             if v1 == v2 and not (v2 & 1):
                                 # get only new data from snapshot and send it to plotter_main_widget
                                 if prev_indexes is not None:
-                                    new_indexes = new_snapshot[:, 0]
+                                    new_indexes = new_snapshot[:, 0].copy()
                                     shift_front = int(new_indexes[0] - prev_indexes[0])
                                     shift_end = int(new_indexes[-1] - prev_indexes[-1])
-                                    if shift_front == 0:  # for the start
-                                        shift_front = shift_end
-                                    if shift_end == 0:
-                                        break
                                     if shift_front == shift_end and shift_front < self.config_global['recordings']['fs']:
                                         if shift_front <= self.config_global['recordings']['fs']//2:
                                             new_data = new_snapshot[-shift_front:, :]
                                             with self.lock_live_plot_data:
                                                 self.plotter_main.ring_buffer_update(new_data)
                                     else:
-                                        print('ERROR')
+                                        print('WARNING - Data shifted irregularly')
                                     prev_indexes = new_indexes.copy()
                                 else:
+                                    new_data = new_snapshot
+                                    with self.lock_live_plot_data:
+                                        self.plotter_main.ring_buffer_update(new_data)
                                     prev_indexes = new_snapshot[:, 0].copy()
-                                break
                 elif new_data is None:  # close the pipe
                     self.event_live_plot.clear()
                     pipe_plotting.close()

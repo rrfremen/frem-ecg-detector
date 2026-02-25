@@ -56,14 +56,14 @@ class ProcessingPipeline:
             if pipe_processing.poll() and not process_paused:
                 signal_from_gui = pipe_processing.recv()
                 if type(signal_from_gui) == str:
-                    if signal_from_gui == 'paused':
+                    if signal_from_gui == 'Pause':
                         process_paused = True
             elif process_paused:  # block the loop if paused
                 signal_from_gui = pipe_processing.recv()
                 if type(signal_from_gui) == str:
-                    if signal_from_gui == 'continue':
+                    if signal_from_gui == 'Continue':
                         process_paused = False
-                    elif signal_from_gui == 'stop':
+                    elif signal_from_gui == 'Stop':
                         process_running = False
 
             # pass on sample index and ecg sample to their ring buffer
@@ -88,9 +88,8 @@ class ProcessingPipeline:
             # pass on detector sample to its ring buffer
             detector_dq.append(detector)
 
-            write_result = True
             # result
-            if write_result:
+            if sample_index >= 360:
                 shm_ver[0] += 1  # odd number - writing
                 # ecg data here
                 result_holder[:, 0] = np.asarray(index_dq)

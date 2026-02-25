@@ -53,6 +53,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.signal_display_recs = controller_vars['display_recs']
         self.signal_live_plot_start = controller_vars['signal_live_plot_start']
         self.signal_live_plot_pause = controller_vars['signal_live_plot_pause']
+        self.signal_live_plot_continue = controller_vars['signal_live_plot_continue']
         self.signal_live_plot_stop = controller_vars['signal_live_plot_stop']
 
     def setup_ui_local(self):
@@ -91,9 +92,12 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         if self.pushButton_start.text() == 'Start':
             self.signal_live_plot_start.emit()
             self.pushButton_start.setText('Pause')
-        else:
+        elif self.pushButton_start.text() == 'Pause':
             self.signal_live_plot_pause.emit()
-            self.pushButton_start.setText('Start')
+            self.pushButton_start.setText('Continue')
+        elif self.pushButton_start.text() == 'Continue':
+            self.signal_live_plot_continue.emit()
+            self.pushButton_start.setText('Pause')
 
     def live_plot_stop(self):
         self.signal_live_plot_stop.emit()
