@@ -8,8 +8,8 @@ from PySide6.QtWidgets import QWidget, QFileDialog
 import wfdb
 
 # private
-from gui.controller_ui import Ui_Form
-from parents.thread_manager import ThreadManager
+from .gui.controller_ui import Ui_Form
+from .parents.thread_manager import ThreadManager
 
 
 class ControllerWidget(QWidget, ThreadManager, Ui_Form):

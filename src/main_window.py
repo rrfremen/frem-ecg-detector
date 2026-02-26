@@ -2,6 +2,8 @@
 from multiprocessing import Lock, Process, Pipe, Event, shared_memory
 from threading import Thread
 import json
+import logging
+from pathlib import Path
 
 # external
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy
@@ -9,35 +11,39 @@ from PySide6.QtCore import Signal, QTimer
 import numpy as np
 
 # private
-from controller_widget import ControllerWidget
-from plotter_main_widget import PlotterMainWidget
-from plotter_side_widget import PlotterSideWidget
-from parents.thread_manager import ThreadManager
-from algorithms.processing_pipeline import ProcessingPipeline
+from .controller_widget import ControllerWidget
+from .plotter_main_widget import PlotterMainWidget
+from .plotter_side_widget import PlotterSideWidget
+from .parents.thread_manager import ThreadManager
+from .algorithms.processing_pipeline import ProcessingPipeline
 
 
 class MainWindow(QMainWindow, ThreadManager):
     className = "MainWindow"
 
-    lock_config_global = Lock()
     signal_display_recs = Signal()
     signal_live_plot_start = Signal()
     signal_live_plot_pause = Signal()
     signal_live_plot_continue = Signal()
     signal_live_plot_stop = Signal()
-    lock_live_plot_data = Lock()
-    lock_live_plot_monitor = Lock()
-    event_live_plot = Event()
 
     def __init__(self):
         super().__init__()
 
+        # locks and events
+        self.lock_config_global = Lock()
+        self.lock_live_plot_data = Lock()
+        self.lock_live_plot_monitor = Lock()
+        self.event_live_plot = Event()
+
         # shared variables
-        with open('config_global.json', 'r') as f:
+        config_global_path = Path(__file__).parent / 'config_global.json'
+        with open(config_global_path, 'r') as f:
             self.config_global = json.load(f)
 
         # local variables
         self.pipe_processing = None
+        self.logger = logging.getLogger('app.' + __name__)
 
         # widgets
         controller_vars = {
@@ -74,6 +80,7 @@ class MainWindow(QMainWindow, ThreadManager):
 
         self.setup_ui_local()
         self.setup_signal()
+        self.logger.info("This is main window")
 
     # setup functions
     def setup_ui_local(self):
@@ -183,9 +190,8 @@ class MainWindow(QMainWindow, ThreadManager):
         thread_worker_pipe_processing_monitor.start()
 
         # unlink shared memory directly now to avoid orphaned memory later
-        print('waiting for confirmation from processing pipeline')
+        # TODO eventually move this to prevent GUI blocking
         processing_handshake = self.pipe_processing.recv()
-        print(f'msg from processing pipeline: {processing_handshake}')
         if processing_handshake == 'shm_attached':
             shm_raw.unlink()
             self.timer_main_plotter.setInterval(int(1000/self.config_global['plotter']['display']['refresh_rate']))  # refresh rate in ms
@@ -193,7 +199,7 @@ class MainWindow(QMainWindow, ThreadManager):
             self.timer_main_plotter.timeout.connect(self.live_plot_update)
             self.timer_main_plotter.start()
             self.lock_live_plot_monitor.release()
-            print('shm succesfully attached to processing pipeline, starting live plot')
+            self.logger.info('SHM handshake from processing pipeline confirmed')
         else:
             ValueError('processing pipeline gave no handshake')
 
@@ -212,7 +218,6 @@ class MainWindow(QMainWindow, ThreadManager):
 
     # pipe stuff
     def worker_pipe_processing_monitor(self, pipe_plotting, shm_raw):
-        print('monitor - started')
         new_data = None
         shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
         shm_arr = np.ndarray(
@@ -223,7 +228,7 @@ class MainWindow(QMainWindow, ThreadManager):
         )
         prev_indexes, new_indexes = None, []
         with self.lock_live_plot_monitor:
-            print('Monitor starting')
+            self.logger.info('Monitor Thread starting')
         while self.event_live_plot.is_set():
             try:
                 new_data = pipe_plotting.recv()  # blocking behaviour
@@ -247,7 +252,7 @@ class MainWindow(QMainWindow, ThreadManager):
                                             with self.lock_live_plot_data:
                                                 self.plotter_main.ring_buffer_update(new_data)
                                     else:
-                                        print('WARNING - Data shifted irregularly')
+                                        self.logger.warning('Data shifted irregularly')
                                     prev_indexes = new_indexes.copy()
                                 else:
                                     new_data = new_snapshot
@@ -258,7 +263,7 @@ class MainWindow(QMainWindow, ThreadManager):
                     self.event_live_plot.clear()
                     pipe_plotting.close()
                 else:
-                    print('WARNING - unknown data received')
+                    self.logger.warning(f'Monitoring Pipeline received unknown data: {new_data}')
             except EOFError:
                 # print('WARNING - processing pipe was closed unexpectedly')
                 break

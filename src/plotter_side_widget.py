@@ -3,8 +3,8 @@ from PySide6.QtWidgets import QWidget
 from PySide6.QtGui import QGuiApplication
 
 # private
-from gui.plotter_side_ui import Ui_Form
-from parents.thread_manager import ThreadManager
+from .gui.plotter_side_ui import Ui_Form
+from .parents.thread_manager import ThreadManager
 
 
 class PlotterSideWidget(QWidget, ThreadManager, Ui_Form):

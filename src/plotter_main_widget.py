@@ -6,7 +6,7 @@ import numpy as np
 import wfdb
 
 # private
-from gui.plotter_main_ui import Ui_Form
+from .gui.plotter_main_ui import Ui_Form
 
 
 class PlotterMainWidget(QWidget, Ui_Form):
