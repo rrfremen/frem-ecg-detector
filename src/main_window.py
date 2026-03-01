@@ -1,6 +1,7 @@
 # internal
 from multiprocessing import Lock, Process, Pipe, Event, shared_memory
 from threading import Thread
+import threading
 import json
 import logging
 from pathlib import Path
@@ -23,9 +24,11 @@ class MainWindow(QMainWindow, ThreadManager):
 
     signal_display_recs = Signal()
     signal_live_plot_start = Signal()
+    signal_live_plot_start_timer = Signal()
     signal_live_plot_pause = Signal()
     signal_live_plot_continue = Signal()
     signal_live_plot_stop = Signal()
+    signal_refresh_rate_update = Signal()
 
     def __init__(self):
         super().__init__()
@@ -47,11 +50,9 @@ class MainWindow(QMainWindow, ThreadManager):
 
         # widgets
         controller_vars = {
-            # config
+            # locks
             'lock_config_global': self.lock_config_global,
-            'get_config': self.get_config,
-            'overwrite_config': self.overwrite_config,
-            # signal
+            # signals
             'display_recs': self.signal_display_recs,
             'signal_live_plot_start': self.signal_live_plot_start,
             'signal_live_plot_pause': self.signal_live_plot_pause,
@@ -64,15 +65,15 @@ class MainWindow(QMainWindow, ThreadManager):
         }
 
         plotter_side_vars = {
-            # config
+            # locks
             'lock_config_global': self.lock_config_global,
-            'get_config': self.get_config,
-            'overwrite_config': self.overwrite_config,
+            # signals
+            'signal_refresh_rate_update': self.signal_refresh_rate_update,
         }
 
-        self.plotter_main = PlotterMainWidget(plotter_main_vars)
-        self.plotter_side = PlotterSideWidget(plotter_side_vars)
-        self.controller = ControllerWidget(controller_vars)
+        self.plotter_main = PlotterMainWidget(self.config_global, plotter_main_vars)
+        self.plotter_side = PlotterSideWidget(self.config_global, plotter_side_vars)
+        self.controller = ControllerWidget(self.config_global, controller_vars)
 
         self.main_children = [self.plotter_main, self.plotter_side, self.controller]
 
@@ -80,7 +81,7 @@ class MainWindow(QMainWindow, ThreadManager):
 
         self.setup_ui_local()
         self.setup_signal()
-        self.logger.info("This is main window")
+        self.logger.info("Built succesfully")
 
     # setup functions
     def setup_ui_local(self):
@@ -117,9 +118,11 @@ class MainWindow(QMainWindow, ThreadManager):
     def setup_signal(self):
         self.signal_display_recs.connect(self.display_recs)
         self.signal_live_plot_start.connect(self.live_plot_start)
+        self.signal_live_plot_start_timer.connect(self.live_plot_start_timer)
         self.signal_live_plot_pause.connect(self.live_plot_pause)
         self.signal_live_plot_continue.connect(self.live_plot_continue)
         self.signal_live_plot_stop.connect(self.live_plot_stop)
+        self.signal_refresh_rate_update.connect(self.refresh_rate_update)
 
     # config functions
     def get_config(self):
@@ -129,7 +132,6 @@ class MainWindow(QMainWindow, ThreadManager):
         self.config_global = config
         for current_child in self.main_children:
             current_child.config_global = self.config_global  # update for all widgets
-        print('config updated')
 
     # GUI functions
     def display_recs(self):
@@ -137,6 +139,38 @@ class MainWindow(QMainWindow, ThreadManager):
         self.plotter_main.update_first_plot()
 
     def live_plot_start(self):
+        if self.event_live_plot.is_set():
+            self.pipe_processing.send('Continue')
+        else:
+            self.thread_add_worker(self.worker_start_live_plot)
+
+    def live_plot_start_timer(self):
+        self.timer_main_plotter.setInterval(
+            int(1000 / self.config_global['plotter']['display']['refresh_rate']))  # refresh rate in ms
+        self.timer_main_plotter.timeout.connect(self.live_plot_update)
+        self.timer_main_plotter.start()
+
+    def live_plot_update(self):
+        with self.lock_live_plot_data:
+            self.plotter_main.live_plot_update()
+
+    def live_plot_pause(self):
+        self.pipe_processing.send('Pause')
+        self.timer_main_plotter.stop()
+
+    def live_plot_continue(self):
+        self.pipe_processing.send('Continue')
+        self.timer_main_plotter.start()
+
+    def live_plot_stop(self):
+        self.pipe_processing.send('Stop')
+        self.timer_main_plotter.stop()
+
+    def refresh_rate_update(self):
+        self.timer_main_plotter.setInterval(int(1000/self.config_global['plotter']['display']['refresh_rate']))
+
+    # worker threads
+    def worker_start_live_plot(self):
         # block live monitor to start running directly as a safeguard
         self.lock_live_plot_monitor.acquire(block=True)
         # pipe for communication with external process
@@ -157,7 +191,7 @@ class MainWindow(QMainWindow, ThreadManager):
         # shared memory for data transfer between processes
         shm_name = 'ecg-shm'
         shm_shape = (self.config_global['recordings']['fs'],
-                     len(self.config_global['recordings']['channels_in_use'])+3)
+                     len(self.config_global['recordings']['channels_in_use']) + 3)
         shm_data_bytes = int(np.prod(shm_shape) * np.dtype(np.float64).itemsize)
         shm_version_bytes = np.dtype(np.uint64).itemsize
         shm_raw = create_shm(name=shm_name, size=(shm_data_bytes + shm_version_bytes))
@@ -168,7 +202,7 @@ class MainWindow(QMainWindow, ThreadManager):
             'data_bytes': shm_data_bytes,
             'version_bytes': shm_version_bytes
         })
-        self.overwrite_config(self.config_global)
+        # self.overwrite_config(self.config_global)
         self.plotter_main.ring_buffer_setup()
 
         # start a background thread to monitor incoming data from external process
@@ -194,31 +228,15 @@ class MainWindow(QMainWindow, ThreadManager):
         processing_handshake = self.pipe_processing.recv()
         if processing_handshake == 'shm_attached':
             shm_raw.unlink()
-            self.timer_main_plotter.setInterval(int(1000/self.config_global['plotter']['display']['refresh_rate']))  # refresh rate in ms
-            # self.timer_main_plotter.setInterval(5000)
-            self.timer_main_plotter.timeout.connect(self.live_plot_update)
-            self.timer_main_plotter.start()
+            self.signal_live_plot_start_timer.emit()
             self.lock_live_plot_monitor.release()
             self.logger.info('SHM handshake from processing pipeline confirmed')
         else:
             ValueError('processing pipeline gave no handshake')
 
-    def live_plot_update(self):
-        with self.lock_live_plot_data:
-            self.plotter_main.live_plot_update()
-
-    def live_plot_pause(self):
-        self.pipe_processing.send('Pause')
-
-    def live_plot_continue(self):
-        self.pipe_processing.send('Continue')
-
-    def live_plot_stop(self):
-        pass
-
-    # pipe stuff
     def worker_pipe_processing_monitor(self, pipe_plotting, shm_raw):
         new_data = None
+        # acquire shared memory
         shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
         shm_arr = np.ndarray(
             shape=self.config_global['preprocessing']['shm']['shape'],
@@ -238,6 +256,7 @@ class MainWindow(QMainWindow, ThreadManager):
                             v1 = shm_ver[0]  # version check to prevent copying while something is being written
                             if v1 & 1:
                                 continue
+                            # TODO - get index first before copying whole data
                             new_snapshot = shm_arr.copy()
                             v2 = shm_ver[0]
                             if v1 == v2 and not (v2 & 1):

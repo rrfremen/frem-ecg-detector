@@ -10,13 +10,13 @@ from .parents.thread_manager import ThreadManager
 class PlotterSideWidget(QWidget, ThreadManager, Ui_Form):
     className = 'PlotterSideWidget'
 
-    def __init__(self, plotter_side_vars):
+    def __init__(self, global_config, plotter_side_vars):
         super().__init__()
         self.setupUi(self)
         self.setup_signal(plotter_side_vars)
 
         # shared variables
-        self.config_global = self.get_config()
+        self.config_global = global_config
 
         self.refresh_rate_init()
 
@@ -26,8 +26,7 @@ class PlotterSideWidget(QWidget, ThreadManager, Ui_Form):
 
         # external signal
         self.lock_config_global = plotter_side_vars['lock_config_global']
-        self.get_config = plotter_side_vars['get_config']
-        self.overwrite_config = plotter_side_vars['overwrite_config']
+        self.signal_refresh_rate_update = plotter_side_vars['signal_refresh_rate_update']
 
     def refresh_rate_init(self):
         current_disp_refresh_rate = int(QGuiApplication.primaryScreen().refreshRate())
@@ -50,3 +49,4 @@ class PlotterSideWidget(QWidget, ThreadManager, Ui_Form):
     def refresh_rate_update(self):
         with self.lock_config_global:
             self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+        self.signal_refresh_rate_update.emit()

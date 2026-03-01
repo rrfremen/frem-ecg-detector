@@ -17,9 +17,9 @@ class ThreadManager:
         self.thread_queue = deque()
         self.thread_queue_lock = Lock()
 
-        self.start_thread()
+        self.thread_start()
 
-    def start_thread(self):
+    def thread_start(self):
         self.thread = Thread(
             name=f'{self.className}-Thread',
             target=self.thread_loop,
@@ -36,12 +36,7 @@ class ThreadManager:
                 with self.thread_queue_lock:
                     current_func = self.thread_queue.popleft()
                 current_func()
-                # print(f'{self.thread.name} finished a task')
-                # save results for logging eventually
 
-    def add_worker(self, func, **kwargs):
+    def thread_add_worker(self, func, **kwargs):
         with self.thread_queue_lock:
             self.thread_queue.append(partial(func, **kwargs))
-
-
-# TODO: eventually combine all parents class into one script for readability

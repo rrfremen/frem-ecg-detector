@@ -58,13 +58,15 @@ class ProcessingPipeline:
                 if type(signal_from_gui) == str:
                     if signal_from_gui == 'Pause':
                         process_paused = True
+                    elif signal_from_gui == 'Stop':
+                        break
             elif process_paused:  # block the loop if paused
                 signal_from_gui = pipe_processing.recv()
                 if type(signal_from_gui) == str:
                     if signal_from_gui == 'Continue':
                         process_paused = False
                     elif signal_from_gui == 'Stop':
-                        process_running = False
+                        break
 
             # pass on sample index and ecg sample to their ring buffer
             index_dq.append(sample_index)

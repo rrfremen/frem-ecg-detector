@@ -12,14 +12,14 @@ from .gui.plotter_main_ui import Ui_Form
 class PlotterMainWidget(QWidget, Ui_Form):
     className = 'PlotterMainWidget'
 
-    def __init__(self, plotter_main_vars):
+    def __init__(self, global_config, plotter_main_vars):
         super().__init__()
         self.setupUi(self)
         self.setup_local_ui()
         self.setup_signal(plotter_main_vars)
 
         # shared variables
-        self.config_global = None
+        self.config_global = global_config
 
         # local variables
         self.data_ring_buffer = []

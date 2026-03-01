@@ -4,7 +4,7 @@ import glob
 from pathlib import Path
 
 # external
-from PySide6.QtWidgets import QWidget, QFileDialog
+from PySide6.QtWidgets import QWidget, QFileDialog, QStyle
 import wfdb
 
 # private
@@ -15,17 +15,18 @@ from .parents.thread_manager import ThreadManager
 class ControllerWidget(QWidget, ThreadManager, Ui_Form):
     className = 'ControllerWidget'
 
-    def __init__(self, controller_vars):
+    def __init__(self, global_config, controller_vars):
         super().__init__()
         self.setupUi(self)
         self.setup_ui_local()
         self.setup_signal(controller_vars)
 
         # shared variables
-        self.config_global = self.get_config()
+        self.config_global = global_config
 
         # local variables
         self.error_txt = ''
+        self.is_paused = False
 
     # setup functions
     def setup_signal(self, controller_vars):
@@ -48,8 +49,6 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
 
         # external signals
         self.lock_config_global = controller_vars['lock_config_global']
-        self.get_config = controller_vars['get_config']
-        self.overwrite_config = controller_vars['overwrite_config']
         self.signal_display_recs = controller_vars['display_recs']
         self.signal_live_plot_start = controller_vars['signal_live_plot_start']
         self.signal_live_plot_pause = controller_vars['signal_live_plot_pause']
@@ -58,6 +57,11 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
 
     def setup_ui_local(self):
         self.pushButton_selectFolder.setDisabled(True)
+        # switch button texts to symbols
+        self.pushButton_start.setText('')
+        self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.pushButton_stop.setText('')
+        self.pushButton_stop.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
         # grey out buttons first
         self.pushButton_start.setDisabled(True)
         self.pushButton_stop.setDisabled(True)
@@ -73,7 +77,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         )
 
         if selected_files:
-            self.add_worker(self.tw_check_selected_files, file_paths=selected_files[0])
+            self.thread_add_worker(self.tw_check_selected_files, file_paths=selected_files[0])
 
     def select_folder(self):
         selected_folder = QFileDialog.getExistingDirectory(
@@ -83,24 +87,24 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         )
 
         if selected_folder:
-            self.add_worker(self.tw_check_selected_files, file_paths=selected_folder)
+            self.thread_add_worker(self.tw_check_selected_files, file_paths=selected_folder)
 
     def clear_recs_selection(self):
         pass
 
     def live_plot_start(self):
-        if self.pushButton_start.text() == 'Start':
+        if not self.is_paused:
             self.signal_live_plot_start.emit()
-            self.pushButton_start.setText('Pause')
-        elif self.pushButton_start.text() == 'Pause':
+            self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+            self.is_paused = True
+        else:
             self.signal_live_plot_pause.emit()
-            self.pushButton_start.setText('Continue')
-        elif self.pushButton_start.text() == 'Continue':
-            self.signal_live_plot_continue.emit()
-            self.pushButton_start.setText('Pause')
+            self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            self.is_paused = False
 
     def live_plot_stop(self):
         self.signal_live_plot_stop.emit()
+        self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
 
     # thread worker functions
     def tw_check_selected_files(self, file_paths):
@@ -152,7 +156,6 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
                 'fs': relevant_headers[1],
                 'units': relevant_headers[2],
             })
-            self.overwrite_config(self.config_global)
 
         self.signal_display_recs.emit()
 
