@@ -26,7 +26,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
 
         # local variables
         self.error_txt = ''
-        self.is_paused = False
+        self.start_or_is_paused = True
 
     # setup functions
     def setup_signal(self, controller_vars):
@@ -46,14 +46,21 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.pushButton_stop.clicked.connect(
             self.live_plot_stop
         )
+        self.checkBox_showProcessedSignal.clicked.connect(
+            self.plot_lower_processed_toggle
+        )
+        self.checkBox_showDetector.clicked.connect(
+            self.plot_lower_detector_toggle
+        )
 
         # external signals
         self.lock_config_global = controller_vars['lock_config_global']
         self.signal_display_recs = controller_vars['display_recs']
         self.signal_live_plot_start = controller_vars['signal_live_plot_start']
         self.signal_live_plot_pause = controller_vars['signal_live_plot_pause']
-        self.signal_live_plot_continue = controller_vars['signal_live_plot_continue']
         self.signal_live_plot_stop = controller_vars['signal_live_plot_stop']
+        self.signal_plot_lower_processed = controller_vars['signal_plot_lower_processed']
+        self.signal_plot_lower_detector = controller_vars['signal_plot_lower_detector']
 
     def setup_ui_local(self):
         self.pushButton_selectFolder.setDisabled(True)
@@ -66,6 +73,8 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.pushButton_start.setDisabled(True)
         self.pushButton_stop.setDisabled(True)
         self.pushButton_settings.setDisabled(True)
+        self.checkBox_showProcessedSignal.setDisabled(True)
+        self.checkBox_showDetector.setDisabled(True)
 
     # button functions
     def select_file(self):
@@ -76,7 +85,7 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
             filter='*.dat'
         )
 
-        if selected_files:
+        if selected_files[0]:
             self.thread_add_worker(self.tw_check_selected_files, file_paths=selected_files[0])
 
     def select_folder(self):
@@ -92,15 +101,25 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
     def clear_recs_selection(self):
         pass
 
+    def plot_lower_processed_toggle(self):
+        self.signal_plot_lower_processed.emit()
+        if self.checkBox_showDetector.isChecked() and not self.checkBox_showProcessedSignal.isChecked():
+            self.checkBox_showDetector.setChecked(False)
+
+    def plot_lower_detector_toggle(self):
+        self.signal_plot_lower_detector.emit()
+        if not self.checkBox_showProcessedSignal.isChecked():
+            self.checkBox_showProcessedSignal.setChecked(True)
+
     def live_plot_start(self):
-        if not self.is_paused:
+        if self.start_or_is_paused:
             self.signal_live_plot_start.emit()
             self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
-            self.is_paused = True
+            self.start_or_is_paused = False
         else:
             self.signal_live_plot_pause.emit()
             self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-            self.is_paused = False
+            self.start_or_is_paused = True
 
     def live_plot_stop(self):
         self.signal_live_plot_stop.emit()
@@ -165,3 +184,5 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.pushButton_start.setDisabled(False)
         self.pushButton_stop.setDisabled(False)
         self.pushButton_settings.setDisabled(False)
+        self.checkBox_showProcessedSignal.setDisabled(False)
+        self.checkBox_showDetector.setDisabled(False)

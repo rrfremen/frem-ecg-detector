@@ -44,10 +44,16 @@ class PlotterMainWidget(QWidget, Ui_Form):
         self.figure_lower = Figure()
         self.canvas_lower = FigureCanvas(self.figure_lower)
         self.plot_lower = self.figure_lower.add_subplot(111)
+        self.plot_lower_extra = self.plot_lower.twinx()
         self.plot_lower.set_visible(False)
+        self.plot_lower_extra.set_visible(False)
 
-        self.gridLayout_2.addWidget(self.canvas_upper)
-        # self.gridLayout_2.addWidget(self.canvas_lower)
+        self.gridLayout_2.addWidget(self.canvas_upper, 0, 0)
+        self.gridLayout_2.addWidget(self.canvas_lower, 1, 0)
+
+        self.gridLayout_2.setRowStretch(0, 1)
+
+        self.canvas_lower.setVisible(False)
 
     def setup_signal(self, plotter_main_vars):
         pass
@@ -82,21 +88,70 @@ class PlotterMainWidget(QWidget, Ui_Form):
         self.plot_upper.set_ylabel('Amplitude in mV')
         self.canvas_upper.draw()
 
+    def canvas_lower_toggle(self):
+        if self.canvas_lower.isVisible():
+            self.canvas_lower.setVisible(False)
+            self.gridLayout_2.setRowStretch(1, 0)
+        else:
+            self.canvas_lower.setVisible(True)
+            self.gridLayout_2.setRowStretch(1, 1)
+
+        if self.plot_upper.get_visible():
+            pass
+
+    def canvas_lower_plots_toggle(self, cmd):
+        # TODO - update lower plot during pause
+        def plot_lower_toggle():
+            state_canvas_lower = not self.canvas_lower.isVisible()
+            self.canvas_lower.setVisible(state_canvas_lower)
+            self.gridLayout_2.setRowStretch(1, state_canvas_lower)
+            # if self.plot_upper.get_visible():
+            self.plot_lower.set_visible(self.plot_upper.get_visible())
+            if not state_canvas_lower:
+                self.plot_lower_extra.set_visible(False)
+
+        if cmd == 'processed':
+            plot_lower_toggle()
+        elif cmd == 'detector':
+            if not self.canvas_lower.isVisible():
+                plot_lower_toggle()
+            self.plot_lower_extra.set_visible(not self.plot_lower_extra.get_visible())
+
     # internal functions
     def live_plot_update(self):
-        # temporarily for one plot only
         if np.any(self.data_ring_buffer[:, 0]):
             current_index = int(np.argmax(self.data_ring_buffer[:, 0]))
             window = 10*360
             if current_index - window > 0:
+                time_index = self.data_ring_buffer[current_index-window:current_index, 0] / self.config_global['recordings']['fs']
                 current_signal = self.data_ring_buffer[current_index-window:current_index, 1]
+                current_signal_processed = self.data_ring_buffer[current_index - window:current_index, 2]
+                current_detector = self.data_ring_buffer[current_index - window:current_index, 3]
             else:
+                time_index = self.data_ring_buffer[0:current_index, 0] / self.config_global['recordings']['fs']
                 current_signal = self.data_ring_buffer[0:current_index, 1]
+                current_signal_processed = self.data_ring_buffer[0:current_index, 2]
+                current_detector = self.data_ring_buffer[0:current_index, 3]
             self.plot_upper.cla()
-            self.plot_upper.plot(current_signal)
+            self.plot_upper.plot(time_index, current_signal)
             self.plot_upper.relim()
             self.plot_upper.autoscale_view()
             self.plot_upper.grid()
+            self.plot_upper.set_xlim(time_index[0], time_index[-1])
             self.plot_upper.set_xlabel('Samples')
             self.plot_upper.set_ylabel('Amplitude in mV')
-            self.canvas_upper.draw()
+            self.canvas_upper.draw_idle()
+
+            if self.canvas_lower.isVisible():
+                self.plot_lower.cla()
+                self.plot_lower_extra.cla()
+                self.plot_lower.plot(time_index, current_signal_processed)
+                self.plot_lower.relim()
+                self.plot_lower.autoscale_view()
+                self.plot_lower.grid()
+                if self.plot_lower_extra.get_visible():
+                    self.plot_lower_extra.plot(time_index, current_detector, color='orange')
+                    self.plot_lower_extra.relim()
+                    self.plot_lower_extra.autoscale_view(scalex=False, scaley=True)
+                self.plot_lower.set_xlim(time_index[0], time_index[-1])
+                self.canvas_lower.draw_idle()

@@ -15,9 +15,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QGridLayout, QHBoxLayout,
-    QListWidget, QListWidgetItem, QPushButton, QSizePolicy,
-    QSpacerItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QGridLayout,
+    QHBoxLayout, QListWidget, QListWidgetItem, QPushButton,
+    QSizePolicy, QSpacerItem, QVBoxLayout, QWidget)
 
 class Ui_Form(object):
     def setupUi(self, Form):
@@ -72,25 +72,40 @@ class Ui_Form(object):
 
         self.horizontalLayout_3.addItem(self.horizontalSpacer)
 
-        self.horizontalLayout = QHBoxLayout()
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.verticalLayout_3 = QVBoxLayout()
+        self.verticalLayout_3.setObjectName(u"verticalLayout_3")
+        self.horizontalLayout_4 = QHBoxLayout()
+        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
         self.pushButton_start = QPushButton(Form)
         self.pushButton_start.setObjectName(u"pushButton_start")
 
-        self.horizontalLayout.addWidget(self.pushButton_start)
+        self.horizontalLayout_4.addWidget(self.pushButton_start)
 
         self.pushButton_stop = QPushButton(Form)
         self.pushButton_stop.setObjectName(u"pushButton_stop")
 
-        self.horizontalLayout.addWidget(self.pushButton_stop)
+        self.horizontalLayout_4.addWidget(self.pushButton_stop)
 
         self.pushButton_settings = QPushButton(Form)
         self.pushButton_settings.setObjectName(u"pushButton_settings")
 
-        self.horizontalLayout.addWidget(self.pushButton_settings)
+        self.horizontalLayout_4.addWidget(self.pushButton_settings)
 
 
-        self.horizontalLayout_3.addLayout(self.horizontalLayout)
+        self.verticalLayout_3.addLayout(self.horizontalLayout_4)
+
+        self.checkBox_showProcessedSignal = QCheckBox(Form)
+        self.checkBox_showProcessedSignal.setObjectName(u"checkBox_showProcessedSignal")
+
+        self.verticalLayout_3.addWidget(self.checkBox_showProcessedSignal)
+
+        self.checkBox_showDetector = QCheckBox(Form)
+        self.checkBox_showDetector.setObjectName(u"checkBox_showDetector")
+
+        self.verticalLayout_3.addWidget(self.checkBox_showDetector)
+
+
+        self.horizontalLayout_3.addLayout(self.verticalLayout_3)
 
         self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
@@ -113,5 +128,7 @@ class Ui_Form(object):
         self.pushButton_start.setText(QCoreApplication.translate("Form", u"Start", None))
         self.pushButton_stop.setText(QCoreApplication.translate("Form", u"Stop", None))
         self.pushButton_settings.setText(QCoreApplication.translate("Form", u"Settings", None))
+        self.checkBox_showProcessedSignal.setText(QCoreApplication.translate("Form", u"Show Signal Processing", None))
+        self.checkBox_showDetector.setText(QCoreApplication.translate("Form", u"Show Detector", None))
     # retranslateUi
 

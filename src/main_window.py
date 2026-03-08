@@ -26,9 +26,10 @@ class MainWindow(QMainWindow, ThreadManager):
     signal_live_plot_start = Signal()
     signal_live_plot_start_timer = Signal()
     signal_live_plot_pause = Signal()
-    signal_live_plot_continue = Signal()
     signal_live_plot_stop = Signal()
     signal_refresh_rate_update = Signal()
+    signal_plot_lower_processed = Signal()
+    signal_plot_lower_detector = Signal()
 
     def __init__(self):
         super().__init__()
@@ -56,8 +57,9 @@ class MainWindow(QMainWindow, ThreadManager):
             'display_recs': self.signal_display_recs,
             'signal_live_plot_start': self.signal_live_plot_start,
             'signal_live_plot_pause': self.signal_live_plot_pause,
-            'signal_live_plot_continue': self.signal_live_plot_continue,
             'signal_live_plot_stop': self.signal_live_plot_stop,
+            'signal_plot_lower_processed': self.signal_plot_lower_processed,
+            'signal_plot_lower_detector': self.signal_plot_lower_detector,
         }
 
         plotter_main_vars = {
@@ -120,9 +122,10 @@ class MainWindow(QMainWindow, ThreadManager):
         self.signal_live_plot_start.connect(self.live_plot_start)
         self.signal_live_plot_start_timer.connect(self.live_plot_start_timer)
         self.signal_live_plot_pause.connect(self.live_plot_pause)
-        self.signal_live_plot_continue.connect(self.live_plot_continue)
         self.signal_live_plot_stop.connect(self.live_plot_stop)
         self.signal_refresh_rate_update.connect(self.refresh_rate_update)
+        self.signal_plot_lower_processed.connect(self.plot_lower_processed_toggle)
+        self.signal_plot_lower_detector.connect(self.plot_lower_detector_toggle)
 
     # config functions
     def get_config(self):
@@ -138,9 +141,16 @@ class MainWindow(QMainWindow, ThreadManager):
         self.controller.update_gui_file_selection()
         self.plotter_main.update_first_plot()
 
+    def plot_lower_processed_toggle(self):
+        self.plotter_main.canvas_lower_plots_toggle('processed')
+
+    def plot_lower_detector_toggle(self):
+        self.plotter_main.canvas_lower_plots_toggle('detector')
+
     def live_plot_start(self):
         if self.event_live_plot.is_set():
             self.pipe_processing.send('Continue')
+            self.timer_main_plotter.start()
         else:
             self.thread_add_worker(self.worker_start_live_plot)
 
@@ -158,12 +168,9 @@ class MainWindow(QMainWindow, ThreadManager):
         self.pipe_processing.send('Pause')
         self.timer_main_plotter.stop()
 
-    def live_plot_continue(self):
-        self.pipe_processing.send('Continue')
-        self.timer_main_plotter.start()
-
     def live_plot_stop(self):
         self.pipe_processing.send('Stop')
+        self.event_live_plot.clear()
         self.timer_main_plotter.stop()
 
     def refresh_rate_update(self):
@@ -281,6 +288,7 @@ class MainWindow(QMainWindow, ThreadManager):
                 elif new_data is None:  # close the pipe
                     self.event_live_plot.clear()
                     pipe_plotting.close()
+                    self.logger.info('event live plot cleared, pipe closed')
                 else:
                     self.logger.warning(f'Monitoring Pipeline received unknown data: {new_data}')
             except EOFError:
