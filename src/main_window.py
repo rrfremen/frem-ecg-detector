@@ -8,7 +8,7 @@ from pathlib import Path
 
 # external
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy
-from PySide6.QtCore import Signal, QTimer
+from PySide6.QtCore import Signal, QTimer, Qt
 import numpy as np
 
 # private
@@ -157,12 +157,14 @@ class MainWindow(QMainWindow, ThreadManager):
     def live_plot_start_timer(self):
         self.timer_main_plotter.setInterval(
             int(1000 / self.config_global['plotter']['display']['refresh_rate']))  # refresh rate in ms
+        self.timer_main_plotter.setTimerType(Qt.PreciseTimer)
         self.timer_main_plotter.timeout.connect(self.live_plot_update)
         self.timer_main_plotter.start()
 
     def live_plot_update(self):
         with self.lock_live_plot_data:
-            self.plotter_main.live_plot_update()
+            data_ring_buffer = self.plotter_main.data_ring_buffer
+        self.plotter_main.live_plot_update(data_ring_buffer)
 
     def live_plot_pause(self):
         self.pipe_processing.send('Pause')
@@ -256,9 +258,9 @@ class MainWindow(QMainWindow, ThreadManager):
             self.logger.info('Monitor Thread starting')
         while self.event_live_plot.is_set():
             try:
-                new_data = pipe_plotting.recv()  # blocking behaviour
-                if type(new_data) == str:
-                    if new_data == 'data_available':
+                msg = pipe_plotting.recv()  # blocking behaviour
+                if type(msg) == str:
+                    if msg == 'data_available':
                         for _ in range(3):  # small retry loop
                             v1 = shm_ver[0]  # version check to prevent copying while something is being written
                             if v1 & 1:
@@ -285,7 +287,8 @@ class MainWindow(QMainWindow, ThreadManager):
                                     with self.lock_live_plot_data:
                                         self.plotter_main.ring_buffer_update(new_data)
                                     prev_indexes = new_snapshot[:, 0].copy()
-                elif new_data is None:  # close the pipe
+                                break
+                elif msg is None:  # close the pipe
                     self.event_live_plot.clear()
                     pipe_plotting.close()
                     self.logger.info('event live plot cleared, pipe closed')

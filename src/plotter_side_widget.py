@@ -31,16 +31,14 @@ class PlotterSideWidget(QWidget, ThreadManager, Ui_Form):
     def refresh_rate_init(self):
         current_disp_refresh_rate = int(QGuiApplication.primaryScreen().refreshRate())
         refresh_rates = []
-        if current_disp_refresh_rate >= 60:
-            refresh_rates = [60, 30, 15]
-        elif current_disp_refresh_rate >= 30:
-            refresh_rates = [30, 15]
+        if current_disp_refresh_rate >= 30:
+            refresh_rates.extend([30, 20, 10])
         else:
-            refresh_rates = [current_disp_refresh_rate]
+            refresh_rates.append(current_disp_refresh_rate)
 
         self.comboBox_refreshRate.addItems([str(r) + ' Hz' for r in refresh_rates])
-        if 30 in refresh_rates:
-            index = refresh_rates.index(30)
+        if 20 in refresh_rates:
+            index = refresh_rates.index(20)
             self.comboBox_refreshRate.setCurrentIndex(index)
 
         with self.lock_config_global:

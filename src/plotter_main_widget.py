@@ -1,7 +1,9 @@
+# built-in
+import time
+
 # external
 from PySide6.QtWidgets import QWidget
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
+import pyqtgraph as pg
 import numpy as np
 import wfdb
 
@@ -25,35 +27,37 @@ class PlotterMainWidget(QWidget, Ui_Form):
         self.data_ring_buffer = []
         self.plot_window = 10
         self.ring_buffer_capacity = 1
+        self.show_plot_detector = False
+        self.current_index_timer = 0
 
-        # self.ax = self.figure.add_subplot(111)
-        # self.x_data = np.arange(0, 2*np.pi, 0.1)
-        # self.y_data = np.sin(self.x_data)
-        # self.line, = self.ax.plot(self.x_data, self.y_data)
-
-        # self.animation = FuncAnimation(self.figure, self.start_plotting, frames=None, interval=100, repeat=False)
+        self.plot_timer_last_time = time.time()
+        self.plot_prev_index = 0
 
     # setup functions
     def setup_local_ui(self):
-        # FigureCanvas for main window
-        self.figure_upper = Figure()
-        self.canvas_upper = FigureCanvas(self.figure_upper)
-        self.plot_upper = self.figure_upper.add_subplot(111)
-        self.plot_upper.set_visible(False)
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
+        # upper plot
+        self.plot_upper = pg.PlotWidget()
+        self.plot_upper.showGrid(x=True, y=True)
+        self.plot_upper.setLabel('left', 'Amplitude', units='mV')
+        self.plot_upper.setLabel('bottom', 'Time', units='s')
 
-        self.figure_lower = Figure()
-        self.canvas_lower = FigureCanvas(self.figure_lower)
-        self.plot_lower = self.figure_lower.add_subplot(111)
-        self.plot_lower_extra = self.plot_lower.twinx()
-        self.plot_lower.set_visible(False)
-        self.plot_lower_extra.set_visible(False)
+        self.line_signal = self.plot_upper.plot(pen='#1c10d1')
 
-        self.gridLayout_2.addWidget(self.canvas_upper, 0, 0)
-        self.gridLayout_2.addWidget(self.canvas_lower, 1, 0)
+        # lower plot
+        self.plot_lower = pg.PlotWidget()
+        self.plot_lower.showGrid(x=True, y=True)
 
+        self.line_processed = self.plot_lower.plot(pen='#1c10d1')
+        self.line_detector = self.plot_lower.plot(pen='#d17810')
+
+        # layout
+        self.gridLayout_2.addWidget(self.plot_upper, 0, 0)
+        self.gridLayout_2.addWidget(self.plot_lower, 1, 0)
         self.gridLayout_2.setRowStretch(0, 1)
 
-        self.canvas_lower.setVisible(False)
+        self.plot_lower.setVisible(False)
 
     def setup_signal(self, plotter_main_vars):
         pass
@@ -76,82 +80,88 @@ class PlotterMainWidget(QWidget, Ui_Form):
 
     # Main Plotter GUI functions - Only use from main_script for centralization
     def update_first_plot(self):
-        # self.gridLayout_2.removeWidget(self.canvas_lower)
-        # self.canvas_lower.setParent(None)
-        self.plot_upper.set_visible(True)
+        self.plot_upper.setVisible(True)
+        fs = self.config_global['recordings']['fs']
         first_path = self.config_global['recordings']['paths'][0]
-        signal = wfdb.rdsamp(first_path)[0][:self.plot_window*self.config_global['recordings']['fs'], 0]
-        time_index = np.arange(len(signal)) / self.config_global['recordings']['fs']
-        self.plot_upper.plot(time_index, signal)
-        self.plot_upper.grid()
-        self.plot_upper.set_xlabel('Time in s')
-        self.plot_upper.set_ylabel('Amplitude in mV')
-        self.canvas_upper.draw()
 
-    def canvas_lower_toggle(self):
-        if self.canvas_lower.isVisible():
-            self.canvas_lower.setVisible(False)
-            self.gridLayout_2.setRowStretch(1, 0)
-        else:
-            self.canvas_lower.setVisible(True)
-            self.gridLayout_2.setRowStretch(1, 1)
+        signal = wfdb.rdsamp(first_path)[0][:self.plot_window * fs, 0]
+        time_index = np.arange(len(signal)) / fs
 
-        if self.plot_upper.get_visible():
-            pass
+        self.line_signal.setData(time_index, signal)
 
     def canvas_lower_plots_toggle(self, cmd):
         # TODO - update lower plot during pause
         def plot_lower_toggle():
-            state_canvas_lower = not self.canvas_lower.isVisible()
-            self.canvas_lower.setVisible(state_canvas_lower)
+            state_canvas_lower = not self.plot_lower.isVisible()
+            self.plot_lower.setVisible(state_canvas_lower)
             self.gridLayout_2.setRowStretch(1, state_canvas_lower)
             # if self.plot_upper.get_visible():
-            self.plot_lower.set_visible(self.plot_upper.get_visible())
+            # self.plot_lower.set_visible(self.plot_upper.get_visible())
             if not state_canvas_lower:
-                self.plot_lower_extra.set_visible(False)
+                self.show_plot_detector = False
 
         if cmd == 'processed':
             plot_lower_toggle()
         elif cmd == 'detector':
-            if not self.canvas_lower.isVisible():
+            if not self.plot_lower.isVisible():
                 plot_lower_toggle()
-            self.plot_lower_extra.set_visible(not self.plot_lower_extra.get_visible())
+            self.show_plot_detector = not self.show_plot_detector
 
     # internal functions
-    def live_plot_update(self):
-        if np.any(self.data_ring_buffer[:, 0]):
-            current_index = int(np.argmax(self.data_ring_buffer[:, 0]))
-            window = 10*360
-            if current_index - window > 0:
-                time_index = self.data_ring_buffer[current_index-window:current_index, 0] / self.config_global['recordings']['fs']
-                current_signal = self.data_ring_buffer[current_index-window:current_index, 1]
-                current_signal_processed = self.data_ring_buffer[current_index - window:current_index, 2]
-                current_detector = self.data_ring_buffer[current_index - window:current_index, 3]
-            else:
-                time_index = self.data_ring_buffer[0:current_index, 0] / self.config_global['recordings']['fs']
-                current_signal = self.data_ring_buffer[0:current_index, 1]
-                current_signal_processed = self.data_ring_buffer[0:current_index, 2]
-                current_detector = self.data_ring_buffer[0:current_index, 3]
-            self.plot_upper.cla()
-            self.plot_upper.plot(time_index, current_signal)
-            self.plot_upper.relim()
-            self.plot_upper.autoscale_view()
-            self.plot_upper.grid()
-            self.plot_upper.set_xlim(time_index[0], time_index[-1])
-            self.plot_upper.set_xlabel('Samples')
-            self.plot_upper.set_ylabel('Amplitude in mV')
-            self.canvas_upper.draw_idle()
+    def live_plot_update(self, data_ring_buffer):
+        fs = self.config_global['recordings']['fs']
+        buffer_capacity = len(data_ring_buffer)
+        window = 10 * fs
 
-            if self.canvas_lower.isVisible():
-                self.plot_lower.cla()
-                self.plot_lower_extra.cla()
-                self.plot_lower.plot(time_index, current_signal_processed)
-                self.plot_lower.relim()
-                self.plot_lower.autoscale_view()
-                self.plot_lower.grid()
-                if self.plot_lower_extra.get_visible():
-                    self.plot_lower_extra.plot(time_index, current_detector, color='orange')
-                    self.plot_lower_extra.relim()
-                    self.plot_lower_extra.autoscale_view(scalex=False, scaley=True)
-                self.plot_lower.set_xlim(time_index[0], time_index[-1])
-                self.canvas_lower.draw_idle()
+        if not np.any(data_ring_buffer[:, 0]):
+            return
+
+        # get current time and get time lapsed inbetween
+        time_now = time.time()
+        dt_real = time_now - self.plot_timer_last_time
+        self.plot_timer_last_time = time_now
+        # calculate appropriate samples for the refresh rate
+        samples_per_frame = fs * dt_real
+        # get index for the amount of appropriate samples
+        self.current_index_timer += samples_per_frame
+        max_index = int(np.max(data_ring_buffer[:, 0]))
+        # make sure index timer doesn't overshoot real data
+        if self.current_index_timer > max_index:
+            self.current_index_timer = max_index
+
+        current_index = int(self.current_index_timer)
+        if current_index <= self.plot_prev_index:
+            return
+        self.plot_prev_index = current_index
+
+        # start = max(0, current_index - window)
+        # segment = data_ring_buffer[start:current_index]
+
+        # handles wrap around at the end of ring buffer
+        end = current_index % buffer_capacity
+        start = (current_index - window) % buffer_capacity
+        if start < end:
+            segment = data_ring_buffer[start:end]
+        else:
+            segment = np.vstack((data_ring_buffer[start:], data_ring_buffer[:end]))
+
+        # dt_data = (current_index - self.plot_prev_index) / fs
+        # print(f'dt real: {dt_real:.4f} | dt data: {dt_data:.4f}')
+
+        # assign data to individual variables
+        time_index = segment[:, 0] / fs
+        current_signal = segment[:, 1]
+        current_signal_processed = segment[:, 2]
+        current_detector = segment[:, 3]
+
+        # upper plot
+        self.line_signal.setData(time_index, current_signal)
+
+        # lower plot
+        if self.plot_lower.isVisible():
+            self.line_processed.setData(time_index, current_signal_processed)
+
+            if self.show_plot_detector:
+                self.line_detector.setData(time_index, current_detector)
+            else:
+                self.line_detector.setData([], [])

@@ -30,6 +30,7 @@ class ProcessingPipeline:
 
         sample_index = 0
         processing_window = self.config_global['recordings']['fs']
+        batch_index, batch_window = 0, int(self.config_global['recordings']['fs']/20)
 
         # data holder
         raw_signal = current_recording.p_signal[:, 0]
@@ -91,7 +92,11 @@ class ProcessingPipeline:
             detector_dq.append(detector)
 
             # result
-            if sample_index >= 360:
+            if sample_index < 360:
+                sample_index += 1
+                continue
+
+            if batch_index >= batch_window:
                 shm_ver[0] += 1  # odd number - writing
                 # ecg data here
                 result_holder[:, 0] = np.asarray(index_dq)
@@ -102,5 +107,7 @@ class ProcessingPipeline:
                 shm_ver[0] += 1  # even number - version is stable
 
                 pipe_processing.send('data_available')
+                batch_index = 0
 
+            batch_index += 1
             sample_index += 1
