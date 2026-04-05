@@ -48,6 +48,8 @@ class PlotterMainWidget(QWidget, Ui_Form):
         # lower plot
         self.plot_lower = pg.PlotWidget()
         self.plot_lower.showGrid(x=True, y=True)
+        self.plot_lower.setLabel('left', 'Amplitude', units='mV^2')
+        self.plot_lower.setLabel('bottom', 'Time', units='s')
 
         self.line_processed = self.plot_lower.plot(pen='#1c10d1')
         self.line_detector = self.plot_lower.plot(pen='#d17810')
@@ -111,7 +113,7 @@ class PlotterMainWidget(QWidget, Ui_Form):
     def live_plot_update(self, data_ring_buffer):
         fs = self.config_global['recordings']['fs']
         buffer_capacity = len(data_ring_buffer)
-        window = 10 * fs
+        window = self.plot_window * fs
 
         if not np.any(data_ring_buffer[:, 0]):
             return
