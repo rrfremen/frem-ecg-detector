@@ -60,6 +60,7 @@ class MainWindow(QMainWindow, ThreadManager):
             'signal_live_plot_stop': self.signal_live_plot_stop,
             'signal_plot_lower_processed': self.signal_plot_lower_processed,
             'signal_plot_lower_detector': self.signal_plot_lower_detector,
+            'signal_refresh_rate_update': self.signal_refresh_rate_update,
         }
 
         plotter_main_vars = {
@@ -67,10 +68,7 @@ class MainWindow(QMainWindow, ThreadManager):
         }
 
         plotter_side_vars = {
-            # locks
-            'lock_config_global': self.lock_config_global,
-            # signals
-            'signal_refresh_rate_update': self.signal_refresh_rate_update,
+
         }
 
         self.plotter_main = PlotterMainWidget(self.config_global, plotter_main_vars)
@@ -139,6 +137,7 @@ class MainWindow(QMainWindow, ThreadManager):
     # GUI functions
     def display_recs(self):
         self.controller.update_gui_file_selection()
+        self.plotter_side.update_gui_file_selection()
         self.plotter_main.update_first_plot()
 
     def plot_lower_processed_toggle(self):

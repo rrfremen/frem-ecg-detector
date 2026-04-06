@@ -5,6 +5,7 @@ from pathlib import Path
 
 # external
 from PySide6.QtWidgets import QWidget, QFileDialog, QStyle
+from PySide6.QtGui import QGuiApplication
 import wfdb
 
 # private
@@ -28,14 +29,13 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.error_txt = ''
         self.start_or_is_paused = True
 
+        self.refresh_rate_init()
+
     # setup functions
     def setup_signal(self, controller_vars):
         # internal signals
         self.pushButton_selectFile.clicked.connect(
             self.select_file
-        )
-        self.pushButton_selectFolder.clicked.connect(
-            self.select_folder
         )
         self.pushButton_clearSelection.clicked.connect(
             self.clear_recs_selection
@@ -52,6 +52,9 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.checkBox_showDetector.clicked.connect(
             self.plot_lower_detector_toggle
         )
+        self.comboBox_refreshRate.currentIndexChanged.connect(
+            self.refresh_rate_update
+        )
 
         # external signals
         self.lock_config_global = controller_vars['lock_config_global']
@@ -61,9 +64,9 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.signal_live_plot_stop = controller_vars['signal_live_plot_stop']
         self.signal_plot_lower_processed = controller_vars['signal_plot_lower_processed']
         self.signal_plot_lower_detector = controller_vars['signal_plot_lower_detector']
+        self.signal_refresh_rate_update = controller_vars['signal_refresh_rate_update']
 
     def setup_ui_local(self):
-        self.pushButton_selectFolder.setDisabled(True)
         # switch button texts to symbols
         self.pushButton_start.setText('')
         self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
@@ -76,7 +79,28 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
         self.checkBox_showProcessedSignal.setDisabled(True)
         self.checkBox_showDetector.setDisabled(True)
 
-    # button functions
+    def refresh_rate_init(self):
+        current_disp_refresh_rate = int(QGuiApplication.primaryScreen().refreshRate())
+        refresh_rates = []
+        if current_disp_refresh_rate >= 30:
+            refresh_rates.extend([30, 20, 10])
+        else:
+            refresh_rates.append(current_disp_refresh_rate)
+
+        self.comboBox_refreshRate.addItems([str(r) + ' Hz' for r in refresh_rates])
+        if 20 in refresh_rates:
+            index = refresh_rates.index(20)
+            self.comboBox_refreshRate.setCurrentIndex(index)
+
+        with self.lock_config_global:
+            self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+
+    # UI functions
+    def refresh_rate_update(self):
+        with self.lock_config_global:
+            self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+        self.signal_refresh_rate_update.emit()
+
     def select_file(self):
         selected_files = QFileDialog.getOpenFileNames(
             self,
@@ -87,16 +111,6 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
 
         if selected_files[0]:
             self.thread_add_worker(self.tw_check_selected_files, file_paths=selected_files[0])
-
-    def select_folder(self):
-        selected_folder = QFileDialog.getExistingDirectory(
-            self,
-            caption='Select a folder to open',
-            dir='/'
-        )
-
-        if selected_folder:
-            self.thread_add_worker(self.tw_check_selected_files, file_paths=selected_folder)
 
     def clear_recs_selection(self):
         pass
@@ -180,7 +194,6 @@ class ControllerWidget(QWidget, ThreadManager, Ui_Form):
 
     # Controller GUI functions - Only use from main_script for centralization
     def update_gui_file_selection(self):
-        self.listWidget_fileSelection.addItems(self.config_global['recordings']['paths'])
         self.pushButton_start.setDisabled(False)
         self.pushButton_stop.setDisabled(False)
         self.pushButton_settings.setDisabled(False)

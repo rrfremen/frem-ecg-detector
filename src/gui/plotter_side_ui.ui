@@ -56,6 +56,13 @@
       </spacer>
      </item>
      <item>
+      <widget class="QLabel" name="label_currentSource">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QProgressBar" name="progressBar_recording">
        <property name="value">
         <number>24</number>
@@ -64,32 +71,6 @@
      </item>
      <item>
       <spacer name="verticalSpacer_4">
-       <property name="orientation">
-        <enum>Qt::Orientation::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>40</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QLabel" name="label_refreshRate">
-       <property name="text">
-        <string>Refresh Rate</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignmentFlag::AlignBottom|Qt::AlignmentFlag::AlignHCenter</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="comboBox_refreshRate"/>
-     </item>
-     <item>
-      <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Orientation::Vertical</enum>
        </property>

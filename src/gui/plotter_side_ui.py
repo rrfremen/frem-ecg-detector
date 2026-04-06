@@ -15,9 +15,8 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QComboBox, QGridLayout, QLabel,
-    QProgressBar, QSizePolicy, QSpacerItem, QVBoxLayout,
-    QWidget)
+from PySide6.QtWidgets import (QApplication, QGridLayout, QLabel, QProgressBar,
+    QSizePolicy, QSpacerItem, QVBoxLayout, QWidget)
 
 class Ui_Form(object):
     def setupUi(self, Form):
@@ -46,6 +45,11 @@ class Ui_Form(object):
 
         self.verticalLayout.addItem(self.verticalSpacer_2)
 
+        self.label_currentSource = QLabel(Form)
+        self.label_currentSource.setObjectName(u"label_currentSource")
+
+        self.verticalLayout.addWidget(self.label_currentSource)
+
         self.progressBar_recording = QProgressBar(Form)
         self.progressBar_recording.setObjectName(u"progressBar_recording")
         self.progressBar_recording.setValue(24)
@@ -55,21 +59,6 @@ class Ui_Form(object):
         self.verticalSpacer_4 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.verticalLayout.addItem(self.verticalSpacer_4)
-
-        self.label_refreshRate = QLabel(Form)
-        self.label_refreshRate.setObjectName(u"label_refreshRate")
-        self.label_refreshRate.setAlignment(Qt.AlignmentFlag.AlignBottom|Qt.AlignmentFlag.AlignHCenter)
-
-        self.verticalLayout.addWidget(self.label_refreshRate)
-
-        self.comboBox_refreshRate = QComboBox(Form)
-        self.comboBox_refreshRate.setObjectName(u"comboBox_refreshRate")
-
-        self.verticalLayout.addWidget(self.comboBox_refreshRate)
-
-        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.verticalLayout.addItem(self.verticalSpacer)
 
 
         self.gridLayout.addLayout(self.verticalLayout, 0, 0, 1, 1)
@@ -83,6 +72,6 @@ class Ui_Form(object):
     def retranslateUi(self, Form):
         Form.setWindowTitle(QCoreApplication.translate("Form", u"Form", None))
         self.label_bpm.setText(QCoreApplication.translate("Form", u"TextLabel", None))
-        self.label_refreshRate.setText(QCoreApplication.translate("Form", u"Refresh Rate", None))
+        self.label_currentSource.setText("")
     # retranslateUi
 
