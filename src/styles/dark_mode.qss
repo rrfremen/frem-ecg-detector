@@ -1,0 +1,123 @@
+QWidget{
+    background-color: #252529;
+    color: #ffffff;
+}
+
+QPushButton{
+    background-color: #4E4E52;
+    border: 1px solid #555;
+    padding: 5px;
+    border-radius: 6px;
+}
+
+QPushButton:hover {
+    background-color: #5a5a5f;
+}
+
+QPushButton:disabled {
+    background-color: #3a3a3a;
+    color: #777;
+    border: 1px solid #444;
+}
+
+QCheckBox {
+    background-color: transparent;
+    padding: 5px;
+}
+
+QCheckBox:hover {
+    background-color: #5a5a5f;
+}
+
+QCheckBox:disabled {
+    color: #777;
+}
+
+QCheckBox::indicator {
+    background-color: transparent;
+    border-radius: 3px;
+    border: 1px solid #aaa;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #4a90e2;
+}
+
+QCheckBox::indicator:disabled {
+    border: 1px solid #555;
+    background-color: #3a3a3a;
+}
+
+QComboBox {
+    background-color: #4E4E52;
+    border: 1px solid #555;
+    padding: 5px;
+    padding-right: 20px;
+    border-radius: 6px;
+}
+
+QComboBox:hover {
+    background-color: #5a5a5f;
+}
+
+QComboBox::drop-down {
+    border-left: 1px solid #555;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    background-color: #4e4e52
+}
+
+QComboBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid white;
+}
+
+QComboBox QAbstractItemView {
+    border: 1px solid #555;
+    border-radius: 6px;
+    background-color: #2b2b2b;
+    selection-background-color: #4a90e2
+}
+
+QPushButton:focus,
+QComboBox:focus {
+    border: 1px solid #4a90e2;
+}
+
+QLabel {
+    color: #ffffff;
+    background-color: transparent;
+}
+
+QLabel#label_bpm {
+    font-size: 24px;
+}
+
+QProgressBar#progress_buffer{
+    border: 1px solid #555;
+    border-radius: 6px;
+    background: #4E4E52;
+    color: transparent;
+    text-align: center;
+}
+
+QProgressBar#progress_buffer::chunk {
+    background: grey;
+    border-radius: 6px;
+}
+
+QProgressBar#progress_plotter {
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    text-align: center;
+    border-radius: 6px;
+}
+
+QProgressBar#progress_plotter::chunk {
+    background: rgba(0, 180, 0, 150);
+    border-radius: 6px;
+}

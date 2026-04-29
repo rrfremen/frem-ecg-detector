@@ -1,0 +1,8 @@
+{
+  "Default": {
+    "detector_window": [20, "int", "10:1:30"],
+    "ait_active": [true, "bool"],
+    "asst_active": [true, "bool"],
+    "asst_ratio": [0.6, "float", "0.1:0.1:1.0"]
+  }
+}

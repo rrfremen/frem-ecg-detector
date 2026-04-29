@@ -1,0 +1,303 @@
+# built-in
+from multiprocessing import Lock, Process, Pipe, Event, shared_memory
+from threading import Thread
+import json
+import logging
+from pathlib import Path
+
+# external
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy, QApplication
+from PySide6.QtCore import Signal, QTimer, Qt
+import numpy as np
+
+# internal
+from .controller_widget import ControllerWidget
+from .plotter_main_widget import PlotterMainWidget
+from .plotter_side_widget import PlotterSideWidget
+from .algorithms.processing_pipeline import ProcessingPipeline
+from .configs.watched_config import WatchedConfig
+
+
+class MainWindow(QMainWindow):
+    className = "MainWindow"
+
+    signal_live_plot_start_timer = Signal()
+    signal_plotters_bpm = Signal(float)
+
+    def __init__(self):
+        super().__init__()
+
+        # locks and events
+        self.lock_config_global = Lock()
+        self.lock_live_plot_data = Lock()
+        self.lock_live_plot_monitor = Lock()
+        self.event_live_plot = Event()
+
+        # shared variables
+        main_path = Path(__file__).parent
+        config_global_path = main_path / 'configs/config_global.json'
+        with open(config_global_path, 'r') as f:
+            config_json = json.load(f)
+        self.config_global = WatchedConfig()
+        self.config_global.load_config(config_json)
+
+        # local variables
+        self.pipe_processing = None
+        self.logger = logging.getLogger('app.' + __name__)
+
+        self.dark_mode_path = main_path / 'styles/dark_mode.qss'
+        self.light_mode_path = main_path / 'styles/light_mode.qss'
+        self.dark_mode = True
+
+        # widgets
+        controller_vars = {
+
+        }
+
+        plotter_main_vars = {
+            'signal_plotters_bpm': self.signal_plotters_bpm
+        }
+
+        plotter_side_vars = {
+            'signal_plotters_bpm': self.signal_plotters_bpm,
+        }
+
+        self.plotter_main = PlotterMainWidget(self.config_global, plotter_main_vars)
+        self.plotter_side = PlotterSideWidget(self.config_global, plotter_side_vars)
+        self.controller = ControllerWidget(self.config_global, self.lock_config_global)
+
+        self.main_children = [self.plotter_main, self.plotter_side, self.controller]
+
+        self.timer_main_plotter = QTimer()
+
+        self.app_set_theme()
+        self.setup_ui_local()
+        self.setup_signal_from_controller()
+        self.logger.info("Built succesfully")
+
+    # setup functions
+    def setup_ui_local(self):
+        # plotter
+        plotter_layout = QHBoxLayout()
+        self.plotter_main.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.plotter_side.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        plotter_layout.addWidget(self.plotter_main)
+        plotter_layout.addWidget(self.plotter_side)
+        plotter_layout.setStretch(0, 4)
+        plotter_layout.setStretch(1, 1)
+        plotter_widget = QWidget()
+        plotter_widget.setLayout(plotter_layout)
+
+        # plotter + controller
+        self.controller.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        central_layout = QVBoxLayout()
+        central_layout.addWidget(plotter_widget)
+        central_layout.addWidget(self.controller)
+        central_layout.setStretch(0, 3)
+        central_layout.setStretch(1, 1)
+
+        central_widget = QWidget()
+        central_widget.setLayout(central_layout)
+
+        self.setCentralWidget(central_widget)
+        self.adjustSize()
+        # self.setMinimumSize(800, self.plotter.height()+self.controller.height())
+
+        # window
+        self.setWindowTitle('ECG Detector')
+        # self.setWindowIcon(QIcon.fromTheme('path'))
+
+    def setup_signal_from_controller(self):
+        self.controller.signal_display_recs.connect(self.display_recs)
+        self.controller.signal_live_plot_start.connect(self.live_plot_start)
+        self.controller.signal_live_plot_pause.connect(self.live_plot_pause)
+        self.controller.signal_live_plot_stop.connect(self.live_plot_stop)
+        self.controller.signal_plot_lower_processed.connect(self.plot_lower_processed_toggle)
+        self.controller.signal_plot_lower_detector.connect(self.plot_lower_detector_toggle)
+        self.controller.signal_app_dark_mode.connect(self.app_set_theme)
+
+        self.signal_live_plot_start_timer.connect(self.live_plot_start_timer)
+        self.config_global['plotter']['display'].watch('refresh_rate', self.refresh_rate_update)
+
+    # GUI functions
+    def app_set_theme(self):
+        app = QApplication.instance()
+        if self.dark_mode:
+            with open(self.light_mode_path, 'r') as f:
+                app.setStyleSheet(f.read())
+            self.plotter_main.set_light_mode()
+            self.dark_mode = False
+        else:
+            with open(self.dark_mode_path, 'r') as f:
+                app.setStyleSheet(f.read())
+            self.plotter_main.set_dark_mode()
+            self.dark_mode = True
+
+    def display_recs(self):
+        self.controller.update_gui_file_selection()
+        self.plotter_side.update_gui_file_selection()
+        self.plotter_main.update_first_plot()
+
+    def plot_lower_processed_toggle(self):
+        self.plotter_main.canvas_lower_plots_toggle('processed')
+
+    def plot_lower_detector_toggle(self):
+        self.plotter_main.canvas_lower_plots_toggle('detector')
+
+    def live_plot_start(self):
+        if self.event_live_plot.is_set():
+            self.pipe_processing.send('Continue')
+            self.timer_main_plotter.start()
+        else:
+            thread_worker_start_live_plot = Thread(
+                name='Thread-Worker-Start-Live-Plot',
+                target=self.worker_start_live_plot,
+            )
+            thread_worker_start_live_plot.start()
+
+    def live_plot_start_timer(self):
+        self.timer_main_plotter.setInterval(
+            int(1000 / self.config_global['plotter']['display']['refresh_rate']))  # refresh rate in ms
+        self.timer_main_plotter.setTimerType(Qt.PreciseTimer)
+        self.timer_main_plotter.timeout.connect(self.live_plot_update)
+        self.timer_main_plotter.start()
+
+    def live_plot_update(self):
+        with self.lock_live_plot_data:
+            data_ring_buffer = self.plotter_main.data_ring_buffer
+        self.plotter_main.live_plot_update(data_ring_buffer)
+
+    def live_plot_pause(self):
+        self.pipe_processing.send('Pause')
+        self.timer_main_plotter.stop()
+
+    def live_plot_stop(self):
+        self.pipe_processing.send('Stop')
+        self.event_live_plot.clear()
+        self.timer_main_plotter.stop()
+
+    def refresh_rate_update(self, key, value):
+        self.timer_main_plotter.setInterval(int(1000/value))
+
+    # worker threads
+    def worker_start_live_plot(self):
+        # block live monitor to start running directly as a safeguard
+        self.lock_live_plot_monitor.acquire(block=True)
+        # pipe for communication with external process
+        pipe_processing, self.pipe_processing = Pipe()
+
+        # internal function for safeguard again shared memory leaks
+        def create_shm(name: str, size: int):
+            # remove if old SHM exists
+            try:
+                old_shm = shared_memory.SharedMemory(name=name, create=False)
+                old_shm.close()
+                old_shm.unlink()
+            except FileNotFoundError:
+                pass
+
+            return shared_memory.SharedMemory(name=name, create=True, size=size)
+
+        # shared memory for data transfer between processes
+        shm_name = 'ecg-shm'
+        shm_shape = (self.config_global['recordings']['fs'],
+                     len(self.config_global['recordings']['channels_in_use']) + 5)
+        shm_data_bytes = int(np.prod(shm_shape) * np.dtype(np.float64).itemsize)
+        shm_version_bytes = np.dtype(np.uint64).itemsize
+        shm_raw = create_shm(name=shm_name, size=(shm_data_bytes + shm_version_bytes))
+
+        self.config_global['preprocessor']['shm'].update({
+            'name': shm_name,
+            'shape': shm_shape,
+            'data_bytes': shm_data_bytes,
+            'version_bytes': shm_version_bytes
+        })
+        self.plotter_main.ring_buffer_setup()
+
+        # start a background thread to monitor incoming data from external process
+        thread_worker_pipe_processing_monitor = Thread(
+            name='Thread-Pipe-Plotting-Monitor',
+            target=self.worker_pipe_processing_monitor,
+            args=(self.pipe_processing, shm_raw)
+        )
+        # start an external process for data processing
+        processing_pipeline = ProcessingPipeline(self.config_global.plain_dict())
+        process_processing = Process(
+            name='Process-Detector',
+            target=processing_pipeline.run,
+            args=(pipe_processing,)
+        )
+        # start all
+        self.event_live_plot.set()
+        process_processing.start()
+        thread_worker_pipe_processing_monitor.start()
+
+        # unlink shared memory directly now to avoid orphaned memory later
+        processing_handshake = self.pipe_processing.recv()
+        if processing_handshake == 'shm_attached':
+            shm_raw.unlink()
+            self.signal_live_plot_start_timer.emit()
+            self.lock_live_plot_monitor.release()
+            self.logger.info('SHM handshake from processing pipeline confirmed')
+        else:
+            ValueError('processing pipeline gave no handshake')
+
+    def worker_pipe_processing_monitor(self, pipe_plotting, shm_raw):
+        new_data = None
+        # acquire shared memory
+        shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
+        shm_arr = np.ndarray(
+            shape=self.config_global['preprocessor']['shm']['shape'],
+            dtype=np.float64,
+            buffer=shm_raw.buf,
+            offset=self.config_global['preprocessor']['shm']['version_bytes']
+        )
+        prev_indexes, new_indexes = None, []
+        with self.lock_live_plot_monitor:
+            self.logger.info('Monitor Thread starting')
+        while self.event_live_plot.is_set():
+            try:
+                msg = pipe_plotting.recv()  # blocking behaviour
+                if type(msg) == str:
+                    if msg == 'data_available':
+                        for _ in range(3):  # small retry loop
+                            v1 = shm_ver[0]  # version check to prevent copying while something is being written
+                            if v1 & 1:
+                                continue
+                            # TODO - get index first before copying whole data
+                            new_snapshot = shm_arr.copy()
+                            v2 = shm_ver[0]
+                            if v1 == v2 and not (v2 & 1):
+                                # get only new data from snapshot and send it to plotter_main_widget
+                                if prev_indexes is not None:
+                                    new_indexes = new_snapshot[:, 0].copy()
+                                    shift_front = int(new_indexes[0] - prev_indexes[0])
+                                    shift_end = int(new_indexes[-1] - prev_indexes[-1])
+                                    # TODO - define fs to avoid lookup each time
+                                    if shift_front == shift_end and shift_front < self.config_global['recordings']['fs']:
+                                        if shift_front <= self.config_global['recordings']['fs']//2:
+                                            if shift_front > 0:
+                                                new_data = new_snapshot[-shift_front:, :]
+                                                with self.lock_live_plot_data:
+                                                    self.plotter_main.ring_buffer_update(new_data)
+                                    else:
+                                        self.logger.warning('Data shifted irregularly')
+                                    prev_indexes = new_indexes.copy()
+                                else:
+                                    new_data = new_snapshot
+                                    with self.lock_live_plot_data:
+                                        self.plotter_main.ring_buffer_update(new_data)
+                                    prev_indexes = new_snapshot[:, 0].copy()
+                                break
+                            print('wrong version, trying again')
+                elif msg is None:  # close the pipe
+                    self.event_live_plot.clear()
+                    pipe_plotting.close()
+                    self.logger.info('event live plot cleared, pipe closed')
+                else:
+                    self.logger.warning(f'Monitoring Pipeline received unknown data: {new_data}')
+            except EOFError:
+                # print('WARNING - processing pipe was closed unexpectedly')
+                break
+            else:
+                pass
