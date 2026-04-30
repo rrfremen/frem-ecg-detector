@@ -6,6 +6,15 @@
     "fs": 0,
     "units": []
   },
+  "extractor": {
+    "active": "",
+    "params": {
+      "active_path": "",
+      "active_channel": ""
+    },
+    "recording_paths": [],
+    "fs": 0
+  },
   "preprocessor": {
     "active": "",
     "params": {

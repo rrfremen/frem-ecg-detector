@@ -201,6 +201,9 @@ class ControllerWidget(QWidget, Ui_Form):
                 'fs': relevant_headers[1],
                 'units': relevant_headers[2],
             })
+            self.config_global['extractor']['active'] = 'WFDBExtractor'
+            self.config_global['extractor']['params']['active_path'] = final_file_paths[0]
+            self.config_global['extractor']['fs'] = relevant_headers[1]
 
         self.signal_display_recs.emit()
 

@@ -6,13 +6,14 @@ import pkgutil
 
 # external
 import numpy as np
-import wfdb
 
 # internal
 from .detector.detector_base import BaseDetector
 from . import detector as detector_pkg
 from .preprocessor.preprocessor_base import BasePreprocessor
 from . import preprocessor as preprocessor_pkg
+from .extractor.extractor_base import BaseExtractor
+from . import extractor as extractor_pkg
 
 
 class ProcessingPipeline:
@@ -20,6 +21,12 @@ class ProcessingPipeline:
         self.config_global = config
         self.config_local = {}
         self.fs = self.config_global['recordings']['fs']
+
+        # initiate extractor
+        self.avail_extractors = self.get_available_modules('extractor', extractor_pkg, BaseExtractor)
+        extractor_name = config.get('extractor', {}).get('active') or 'WFDBExtractor'
+        self.extractor = self.avail_extractors.get(extractor_name, self.avail_extractors['WFDBExtractor'])()
+        self.extractor.set_config(config)
 
         # initiate preprocessor
         self.avail_preprocessors = self.get_available_modules('preprocessor', preprocessor_pkg, BasePreprocessor)
@@ -47,9 +54,6 @@ class ProcessingPipeline:
                 if isinstance(obj, type) and issubclass(obj, base_class) and obj is not base_class:
                     available[name] = obj
         return available
-
-    def extract_recording(self):
-        pass
 
     def get_shm(self):
         shm_raw = shared_memory.SharedMemory(name=self.config_global['preprocessor']['shm']['name'], create=False)
@@ -80,18 +84,11 @@ class ProcessingPipeline:
         process_running, process_paused = True, False
         print('starting processing pipeline')
 
-        # offline dataset
-        current_recording = wfdb.rdrecord(self.config_global['recordings']['paths'][0])
-        if self.config_global['recordings']['channels_in_use'][0] not in current_recording.sig_name:  # [0] is temporary
-            raise ValueError('Selected channels not found in recording')
-
         # windows and indexes
         sample_index = 0
         batch_index, batch_window = 0, int(self.fs / self.config_global['preprocessor']['batch_window'])  # 20 ms batch
 
         # data holder
-        raw_signal = current_recording.p_signal[:, 0]
-
         index_dq = deque([0] * self.fs, maxlen=self.fs)
         signal_dq = deque([0] * self.fs, maxlen=self.fs)
         signal_processed_dq = deque([0] * self.fs, maxlen=self.fs)
@@ -126,7 +123,7 @@ class ProcessingPipeline:
 
             # pass on sample index and ecg sample to their ring buffer
             index_dq.append(sample_index)
-            signal_dq.append(raw_signal[sample_index])
+            signal_dq.append(self.extractor.next_sample())
 
             # pre-processing stuff
             processed_sample = self.preprocessor.preprocess(signal_dq[-1])
