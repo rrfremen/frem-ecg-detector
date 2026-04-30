@@ -30,8 +30,8 @@ class MainWindow(QMainWindow):
         # locks and events
         self.lock_config_global = Lock()
         self.lock_live_plot_data = Lock()
-        self.lock_live_plot_monitor = Lock()
         self.event_live_plot = Event()
+        self.event_live_plot_failed = Event()
 
         # shared variables
         main_path = Path(__file__).parent
@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         # local variables
         self.pipe_processing = None
         self.logger = logging.getLogger('app.' + __name__)
+        self.plotting_start = True
 
         self.dark_mode_path = main_path / 'styles/dark_mode.qss'
         self.light_mode_path = main_path / 'styles/light_mode.qss'
@@ -73,7 +74,7 @@ class MainWindow(QMainWindow):
         self.app_set_theme()
         self.setup_ui_local()
         self.setup_signal_from_controller()
-        self.logger.info("Built succesfully")
+        self.logger.info("Built successfully")
 
     # setup functions
     def setup_ui_local(self):
@@ -100,8 +101,8 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(central_layout)
 
         self.setCentralWidget(central_widget)
-        self.adjustSize()
-        # self.setMinimumSize(800, self.plotter.height()+self.controller.height())
+        # self.adjustSize()
+        self.setMinimumSize(800, self.plotter_main.height()+self.controller.height())
 
         # window
         self.setWindowTitle('ECG Detector')
@@ -146,7 +147,8 @@ class MainWindow(QMainWindow):
 
     def live_plot_start(self):
         if self.event_live_plot.is_set():
-            self.pipe_processing.send('Continue')
+            # self.pipe_processing.send('Continue')
+            self.plotting_start = True
             self.timer_main_plotter.start()
         else:
             thread_worker_start_live_plot = Thread(
@@ -160,15 +162,18 @@ class MainWindow(QMainWindow):
             int(1000 / self.config_global['plotter']['display']['refresh_rate']))  # refresh rate in ms
         self.timer_main_plotter.setTimerType(Qt.PreciseTimer)
         self.timer_main_plotter.timeout.connect(self.live_plot_update)
+        self.plotting_start = True
+        self.plotter_main.ring_buffer_progress_setup_and_start()
         self.timer_main_plotter.start()
 
     def live_plot_update(self):
         with self.lock_live_plot_data:
             data_ring_buffer = self.plotter_main.data_ring_buffer
-        self.plotter_main.live_plot_update(data_ring_buffer)
+        self.plotter_main.live_plot_update(data_ring_buffer, self.plotting_start)
+        if self.plotting_start: self.plotting_start = False
 
     def live_plot_pause(self):
-        self.pipe_processing.send('Pause')
+        # self.pipe_processing.send('Pause')
         self.timer_main_plotter.stop()
 
     def live_plot_stop(self):
@@ -181,8 +186,6 @@ class MainWindow(QMainWindow):
 
     # worker threads
     def worker_start_live_plot(self):
-        # block live monitor to start running directly as a safeguard
-        self.lock_live_plot_monitor.acquire(block=True)
         # pipe for communication with external process
         pipe_processing, self.pipe_processing = Pipe()
 
@@ -228,7 +231,6 @@ class MainWindow(QMainWindow):
             args=(pipe_processing,)
         )
         # start all
-        self.event_live_plot.set()
         process_processing.start()
         thread_worker_pipe_processing_monitor.start()
 
@@ -236,11 +238,13 @@ class MainWindow(QMainWindow):
         processing_handshake = self.pipe_processing.recv()
         if processing_handshake == 'shm_attached':
             shm_raw.unlink()
+            self.event_live_plot.set()
             self.signal_live_plot_start_timer.emit()
-            self.lock_live_plot_monitor.release()
             self.logger.info('SHM handshake from processing pipeline confirmed')
+        elif processing_handshake == 'failed_start':
+            self.event_live_plot_failed.set()
         else:
-            ValueError('processing pipeline gave no handshake')
+            raise ValueError('processing pipeline gave no handshake')
 
     def worker_pipe_processing_monitor(self, pipe_plotting, shm_raw):
         new_data = None
@@ -253,8 +257,13 @@ class MainWindow(QMainWindow):
             offset=self.config_global['preprocessor']['shm']['version_bytes']
         )
         prev_indexes, new_indexes = None, []
-        with self.lock_live_plot_monitor:
-            self.logger.info('Monitor Thread starting')
+
+        while not self.event_live_plot.wait(timeout=1):
+            if self.event_live_plot_failed.is_set():
+                self.logger.info('Monitor shutting down')
+                return
+        self.logger.info('Monitor Thread starting')
+
         while self.event_live_plot.is_set():
             try:
                 msg = pipe_plotting.recv()  # blocking behaviour

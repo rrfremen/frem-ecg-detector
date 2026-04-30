@@ -51,6 +51,17 @@ class ProcessingPipeline:
     def extract_recording(self):
         pass
 
+    def get_shm(self):
+        shm_raw = shared_memory.SharedMemory(name=self.config_global['preprocessor']['shm']['name'], create=False)
+        shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
+        shm_arr = np.ndarray(
+            shape=self.config_global['preprocessor']['shm']['shape'],
+            dtype=np.float64,
+            buffer=shm_raw.buf,
+            offset=self.config_global['preprocessor']['shm']['version_bytes']
+        )
+        return shm_raw, shm_ver, shm_arr
+
     def calculate_bpm(self, beat_timestamp):
         self.beat_timestamps.append(beat_timestamp)
 
@@ -90,15 +101,9 @@ class ProcessingPipeline:
         result_holder = np.zeros(self.config_global['preprocessor']['shm']['shape'])
 
         # shared memory assignments
-        shm_raw = shared_memory.SharedMemory(name=self.config_global['preprocessor']['shm']['name'], create=False)
-        shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
-        shm_arr = np.ndarray(
-            shape=self.config_global['preprocessor']['shm']['shape'],
-            dtype=np.float64,
-            buffer=shm_raw.buf,
-            offset=self.config_global['preprocessor']['shm']['version_bytes']
-        )
+        shm_raw, shm_ver, shm_arr = self.get_shm()
         shm_ver[0] = 0  # initialize version
+
         pipe_processing.send('shm_attached')  # send handshake confirmation
         print('sent handshake to main process')
 

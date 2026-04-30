@@ -51,6 +51,10 @@ class Ui_Form(object):
 
         self.verticalLayout.addWidget(self.label_currentSource)
 
+        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.verticalLayout.addItem(self.verticalSpacer)
+
 
         self.gridLayout.addLayout(self.verticalLayout, 0, 0, 1, 1)
 

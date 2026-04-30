@@ -101,10 +101,12 @@ QProgressBar#progress_buffer{
     background: #e0e0e0;
     color: transparent;
     text-align: center;
+    border-radius: 6px;
 }
 
 QProgressBar#progress_buffer::chunk {
     background: grey;
+    border-radius: 6px;
 }
 
 QProgressBar#progress_plotter {
@@ -112,8 +114,10 @@ QProgressBar#progress_plotter {
     background: transparent;
     color: black;
     text-align: center;
+    border-radius: 6px;
 }
 
 QProgressBar#progress_plotter::chunk {
     background: rgba(0, 180, 0, 150);
+    border-radius: 6px;
 }

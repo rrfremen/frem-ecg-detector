@@ -3,6 +3,7 @@ import time
 
 # external
 from PySide6.QtWidgets import QWidget, QProgressBar
+from PySide6.QtCore import QTimer, Qt
 import pyqtgraph as pg
 import numpy as np
 import wfdb
@@ -35,6 +36,8 @@ class PlotterMainWidget(QWidget, Ui_Form):
 
         self.bpm_prev = 0
 
+        # progress bar
+        self.progress_timer = QTimer()
         self.buffer_index = 0
 
     # setup functions
@@ -108,6 +111,14 @@ class PlotterMainWidget(QWidget, Ui_Form):
             bpm = data_from_pipeline[bpm_idx[0], 5]
             self.data_ring_buffer[abs_idx, 5] = bpm
 
+    def ring_buffer_progress_setup_and_start(self):
+        self.progress_timer.setInterval(500)
+        self.progress_timer.timeout.connect(self.ring_buffer_progress_update)
+        self.progress_timer.start()
+
+    def ring_buffer_progress_update(self):
+        self.progress_widget.update_progress_buffer(self.buffer_index)
+
     # Main Plotter GUI functions - Only use from main_script for centralization
     def set_light_mode(self):
         self.plot_upper.setBackground('w')
@@ -164,13 +175,16 @@ class PlotterMainWidget(QWidget, Ui_Form):
             self.show_plot_detector = not self.show_plot_detector
 
     # external functions
-    def live_plot_update(self, data_ring_buffer):
+    def live_plot_update(self, data_ring_buffer, plotting_start):
         fs = self.config_global['recordings']['fs']
         buffer_capacity = len(data_ring_buffer)
         window = self.plot_window * fs
 
         if not np.any(data_ring_buffer[:, 0]):
             return
+
+        if plotting_start:
+            self.plot_timer_last_time = time.time()
 
         # get current time and get time lapsed inbetween
         time_now = time.time()
@@ -230,7 +244,6 @@ class PlotterMainWidget(QWidget, Ui_Form):
                 self.line_detector.setData([], [])
 
         # progress bar
-        self.progress_widget.update_progress_buffer(self.buffer_index)  # TODO - make independent of plot update
         self.progress_widget.update_progress_plotter(segment[-1, 0])
 
 

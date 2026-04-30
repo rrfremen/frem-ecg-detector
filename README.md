@@ -17,6 +17,6 @@ analysis.
 
 This project was developed from a strong interest in ECG systems
 and software engineering, with a focus on building robust real-time
-processing pipelines. It reflects my approach to designing systems from 
-first principles, emphasizing clarity, correctness, and control
+processing pipelines. It reflects my approach to designing systems, emphasizing 
+clarity, correctness, and control
 over the implementation.
