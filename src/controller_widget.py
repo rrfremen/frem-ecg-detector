@@ -39,7 +39,7 @@ class ControllerWidget(QWidget, Ui_Form):
         self.error_txt = ''
         self.start_or_is_paused = True
 
-        self.refresh_rate_init()
+        # self.refresh_rate_init()
         self.preprocessor_init()
         self.detector_init()
 
@@ -64,9 +64,6 @@ class ControllerWidget(QWidget, Ui_Form):
         self.checkBox_showDetector.clicked.connect(
             self.plot_lower_detector_toggle
         )
-        self.comboBox_refreshRate.currentIndexChanged.connect(
-            self.refresh_rate_update
-        )
         self.checkBox_darkMode.clicked.connect(
             lambda: self.signal_app_dark_mode.emit()
         )
@@ -84,21 +81,21 @@ class ControllerWidget(QWidget, Ui_Form):
         self.checkBox_showProcessedSignal.setDisabled(True)
         self.checkBox_showDetector.setDisabled(True)
 
-    def refresh_rate_init(self):
-        current_disp_refresh_rate = int(QGuiApplication.primaryScreen().refreshRate())
-        refresh_rates = []
-        if current_disp_refresh_rate >= 30:
-            refresh_rates.extend([30, 20, 10])
-        else:
-            refresh_rates.append(current_disp_refresh_rate)
-
-        self.comboBox_refreshRate.addItems([str(r) + ' Hz' for r in refresh_rates])
-        if 20 in refresh_rates:
-            index = refresh_rates.index(20)
-            self.comboBox_refreshRate.setCurrentIndex(index)
-
-        with self.lock_config_global:
-            self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+    # def refresh_rate_init(self):
+    #     current_disp_refresh_rate = int(QGuiApplication.primaryScreen().refreshRate())
+    #     refresh_rates = []
+    #     if current_disp_refresh_rate >= 30:
+    #         refresh_rates.extend([30, 20, 10])
+    #     else:
+    #         refresh_rates.append(current_disp_refresh_rate)
+    #
+    #     self.comboBox_refreshRate.addItems([str(r) + ' Hz' for r in refresh_rates])
+    #     if 20 in refresh_rates:
+    #         index = refresh_rates.index(20)
+    #         self.comboBox_refreshRate.setCurrentIndex(index)
+    #
+    #     with self.lock_config_global:
+    #         self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
 
     def preprocessor_init(self):
         # TODO - waiting UI update
@@ -109,9 +106,9 @@ class ControllerWidget(QWidget, Ui_Form):
         self.config_global['detector']['active'] = 'DefaultDetector'
 
     # UI functions
-    def refresh_rate_update(self):
-        with self.lock_config_global:
-            self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+    # def refresh_rate_update(self):
+    #     with self.lock_config_global:
+    #         self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
 
     def select_file(self):
         selected_files = QFileDialog.getOpenFileNames(

@@ -14,7 +14,7 @@ class BaseExtractor(ABC):
         pass
 
     @abstractmethod
-    def next_sample(self) -> float:
+    def next_sample(self) -> float | None:
         pass
 
     @abstractmethod

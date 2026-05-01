@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>800</width>
-    <height>140</height>
+    <height>148</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -101,23 +101,6 @@
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
-        <layout class="QVBoxLayout" name="verticalLayout_5">
-         <item>
-          <widget class="QLabel" name="label_refreshRate">
-           <property name="text">
-            <string>Refresh Rate</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="comboBox_refreshRate"/>
-         </item>
-        </layout>
-       </item>
-       <item>
         <widget class="QCheckBox" name="checkBox_showProcessedSignal">
          <property name="text">
           <string>Show Signal Processing</string>
@@ -128,6 +111,13 @@
         <widget class="QCheckBox" name="checkBox_showDetector">
          <property name="text">
           <string>Show Detector</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="checkBox_showAnns">
+         <property name="text">
+          <string>Show File Annotations</string>
          </property>
         </widget>
        </item>

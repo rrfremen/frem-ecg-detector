@@ -15,15 +15,15 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout,
-    QHBoxLayout, QLabel, QPushButton, QSizePolicy,
-    QSpacerItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QGridLayout, QHBoxLayout,
+    QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout,
+    QWidget)
 
 class Ui_Form(object):
     def setupUi(self, Form):
         if not Form.objectName():
             Form.setObjectName(u"Form")
-        Form.resize(800, 140)
+        Form.resize(800, 148)
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -88,22 +88,6 @@ class Ui_Form(object):
 
         self.verticalLayout_4 = QVBoxLayout()
         self.verticalLayout_4.setObjectName(u"verticalLayout_4")
-        self.verticalLayout_5 = QVBoxLayout()
-        self.verticalLayout_5.setObjectName(u"verticalLayout_5")
-        self.label_refreshRate = QLabel(Form)
-        self.label_refreshRate.setObjectName(u"label_refreshRate")
-        self.label_refreshRate.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.verticalLayout_5.addWidget(self.label_refreshRate)
-
-        self.comboBox_refreshRate = QComboBox(Form)
-        self.comboBox_refreshRate.setObjectName(u"comboBox_refreshRate")
-
-        self.verticalLayout_5.addWidget(self.comboBox_refreshRate)
-
-
-        self.verticalLayout_4.addLayout(self.verticalLayout_5)
-
         self.checkBox_showProcessedSignal = QCheckBox(Form)
         self.checkBox_showProcessedSignal.setObjectName(u"checkBox_showProcessedSignal")
 
@@ -113,6 +97,11 @@ class Ui_Form(object):
         self.checkBox_showDetector.setObjectName(u"checkBox_showDetector")
 
         self.verticalLayout_4.addWidget(self.checkBox_showDetector)
+
+        self.checkBox_showAnns = QCheckBox(Form)
+        self.checkBox_showAnns.setObjectName(u"checkBox_showAnns")
+
+        self.verticalLayout_4.addWidget(self.checkBox_showAnns)
 
         self.checkBox_darkMode = QCheckBox(Form)
         self.checkBox_darkMode.setObjectName(u"checkBox_darkMode")
@@ -142,9 +131,9 @@ class Ui_Form(object):
         self.pushButton_start.setText(QCoreApplication.translate("Form", u"Start", None))
         self.pushButton_stop.setText(QCoreApplication.translate("Form", u"Stop", None))
         self.pushButton_settings.setText(QCoreApplication.translate("Form", u"Settings", None))
-        self.label_refreshRate.setText(QCoreApplication.translate("Form", u"Refresh Rate", None))
         self.checkBox_showProcessedSignal.setText(QCoreApplication.translate("Form", u"Show Signal Processing", None))
         self.checkBox_showDetector.setText(QCoreApplication.translate("Form", u"Show Detector", None))
+        self.checkBox_showAnns.setText(QCoreApplication.translate("Form", u"Show File Annotations", None))
         self.checkBox_darkMode.setText(QCoreApplication.translate("Form", u"Dark Mode", None))
     # retranslateUi
 

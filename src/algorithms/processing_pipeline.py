@@ -114,6 +114,7 @@ class ProcessingPipeline:
                     elif signal_from_gui == 'Stop':
                         break
             elif process_paused:  # block the loop if paused
+                print('pipeline on pause')
                 signal_from_gui = pipe_processing.recv()
                 if type(signal_from_gui) == str:
                     if signal_from_gui == 'Continue':
@@ -122,8 +123,15 @@ class ProcessingPipeline:
                         break
 
             # pass on sample index and ecg sample to their ring buffer
+            next_sample = self.extractor.next_sample()
+
+            if next_sample is None:
+                pipe_processing.send('pipeline_finished_and_paused')
+                process_paused = True
+                continue
+
             index_dq.append(sample_index)
-            signal_dq.append(self.extractor.next_sample())
+            signal_dq.append(next_sample)
 
             # pre-processing stuff
             processed_sample = self.preprocessor.preprocess(signal_dq[-1])

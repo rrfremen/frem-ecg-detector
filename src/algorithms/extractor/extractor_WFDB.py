@@ -28,7 +28,9 @@ class WFDBExtractor(BaseExtractor):
     def update_config(self, key: str, value):
         pass
 
-    def next_sample(self) -> float:
+    def next_sample(self) -> float | None:
+        if self.index >= len(self.raw_signal):
+            return None
         sample = self.raw_signal[self.index]
         self.index += 1
         return sample

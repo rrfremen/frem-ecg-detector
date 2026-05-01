@@ -217,10 +217,10 @@ class MainWindow(QMainWindow):
         })
         self.plotter_main.ring_buffer_setup()
 
-        # start a background thread to monitor incoming data from external process
-        thread_worker_pipe_processing_monitor = Thread(
-            name='Thread-Pipe-Plotting-Monitor',
-            target=self.worker_pipe_processing_monitor,
+        # start a background thread to listen to incoming data from external process
+        thread_worker_listener_pipe_processing = Thread(
+            name='Thread-Pipe-Plotting-Listener',
+            target=self.worker_listener_pipe_processing,
             args=(self.pipe_processing, shm_raw)
         )
         # start an external process for data processing
@@ -232,7 +232,7 @@ class MainWindow(QMainWindow):
         )
         # start all
         process_processing.start()
-        thread_worker_pipe_processing_monitor.start()
+        thread_worker_listener_pipe_processing.start()
 
         # unlink shared memory directly now to avoid orphaned memory later
         processing_handshake = self.pipe_processing.recv()
@@ -246,8 +246,7 @@ class MainWindow(QMainWindow):
         else:
             raise ValueError('processing pipeline gave no handshake')
 
-    def worker_pipe_processing_monitor(self, pipe_plotting, shm_raw):
-        new_data = None
+    def worker_listener_pipe_processing(self, pipe_plotting, shm_raw):
         # acquire shared memory
         shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
         shm_arr = np.ndarray(
@@ -267,7 +266,7 @@ class MainWindow(QMainWindow):
         while self.event_live_plot.is_set():
             try:
                 msg = pipe_plotting.recv()  # blocking behaviour
-                if type(msg) == str:
+                if isinstance(msg, str):
                     if msg == 'data_available':
                         for _ in range(3):  # small retry loop
                             v1 = shm_ver[0]  # version check to prevent copying while something is being written
@@ -299,14 +298,14 @@ class MainWindow(QMainWindow):
                                     prev_indexes = new_snapshot[:, 0].copy()
                                 break
                             print('wrong version, trying again')
+                    elif msg == 'pipeline_finished_and_paused':
+                        self.logger.info('Pipeline listener on hold')
                 elif msg is None:  # close the pipe
                     self.event_live_plot.clear()
                     pipe_plotting.close()
                     self.logger.info('event live plot cleared, pipe closed')
                 else:
-                    self.logger.warning(f'Monitoring Pipeline received unknown data: {new_data}')
+                    self.logger.warning(f'Pipeline listener received unknown data: {msg}')
             except EOFError:
                 # print('WARNING - processing pipe was closed unexpectedly')
                 break
-            else:
-                pass
