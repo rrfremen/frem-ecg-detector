@@ -30,6 +30,6 @@ class PlotterSideWidget(QWidget, Ui_Form):
 
     # Side Plotter GUI Functions - Only use from main_Script for centralization
     def update_gui_file_selection(self):
-        file_selected = self.config_global['recordings']['paths'][0]
+        file_selected = self.config_global['extractor']['params']['active_path']
         file_selected = Path(file_selected).name
         self.label_currentSource.setText(f'Source: {file_selected}.dat')

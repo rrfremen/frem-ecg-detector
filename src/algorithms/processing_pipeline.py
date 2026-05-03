@@ -20,7 +20,7 @@ class ProcessingPipeline:
     def __init__(self, config:dict):
         self.config_global = config
         self.config_local = {}
-        self.fs = self.config_global['recordings']['fs']
+        self.fs = self.config_global['extractor']['fs']
 
         # initiate extractor
         self.avail_extractors = self.get_available_modules('extractor', extractor_pkg, BaseExtractor)

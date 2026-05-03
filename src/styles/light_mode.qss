@@ -92,6 +92,10 @@ QLabel {
     background-color: transparent;
 }
 
+QLabel:disabled {
+    color: #999;
+}
+
 QLabel#label_bpm {
     font-size: 24px;
 }
@@ -121,3 +125,40 @@ QProgressBar#progress_plotter::chunk {
     background: rgba(0, 180, 0, 150);
     border-radius: 6px;
 }
+
+QListWidget {
+    background-color: #ffffff;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    padding: 2px;
+}
+
+QListWidget:disabled {
+    background-color: #eee;
+    color: #999;
+    border: 1px solid #ccc;
+}
+
+QListWidget::item {
+    padding: 5px;
+    border-radius: 4px;
+    color: #22222;
+}
+
+QListWidget::item:hover {
+    background-color: #d6d6d6;
+}
+
+QListWidget::item:selected{
+    background-color: #4a90e2;
+    color: #22222;
+}
+
+QListWidget::item:disabled {
+    color #999;
+}
+
+QListWidget:focus {
+    border: 1px solid #4a90e2;
+}
+

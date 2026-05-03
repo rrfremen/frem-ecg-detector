@@ -41,7 +41,7 @@ class DefaultDetector(BaseDetector):
         self.asst_current_peak = 0
 
     def set_config(self, config: dict):
-        self.fs = config.get('recordings', {}).get('fs', 1)
+        self.fs = config.get('extractor', {}).get('fs', 1)
         self.detector_window = config.get('detector', {}).get('params', {}).get('detector_window', 20)
         self.ait_active = config.get('detector', {}).get('params', {}).get('ait_active', True)
         self.asst_active = config.get('detector', {}).get('params', {}).get('asst_active', True)

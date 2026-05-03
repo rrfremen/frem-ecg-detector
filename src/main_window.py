@@ -135,7 +135,7 @@ class MainWindow(QMainWindow):
             self.dark_mode = True
 
     def display_recs(self):
-        self.controller.update_gui_file_selection()
+        self.controller.update_gui_channel_selected()
         self.plotter_side.update_gui_file_selection()
         self.plotter_main.update_first_plot()
 
@@ -203,8 +203,8 @@ class MainWindow(QMainWindow):
 
         # shared memory for data transfer between processes
         shm_name = 'ecg-shm'
-        shm_shape = (self.config_global['recordings']['fs'],
-                     len(self.config_global['recordings']['channels_in_use']) + 5)
+        shm_shape = (self.config_global['extractor']['fs'],
+                     len(self.config_global['extractor']['params']['active_channel']) + 5)
         shm_data_bytes = int(np.prod(shm_shape) * np.dtype(np.float64).itemsize)
         shm_version_bytes = np.dtype(np.uint64).itemsize
         shm_raw = create_shm(name=shm_name, size=(shm_data_bytes + shm_version_bytes))
@@ -247,6 +247,7 @@ class MainWindow(QMainWindow):
             raise ValueError('processing pipeline gave no handshake')
 
     def worker_listener_pipe_processing(self, pipe_plotting, shm_raw):
+        fs = self.config_global['extractor']['fs']
         # acquire shared memory
         shm_ver = np.ndarray(shape=(1,), dtype=np.uint64, buffer=shm_raw.buf, offset=0)
         shm_arr = np.ndarray(
@@ -282,8 +283,8 @@ class MainWindow(QMainWindow):
                                     shift_front = int(new_indexes[0] - prev_indexes[0])
                                     shift_end = int(new_indexes[-1] - prev_indexes[-1])
                                     # TODO - define fs to avoid lookup each time
-                                    if shift_front == shift_end and shift_front < self.config_global['recordings']['fs']:
-                                        if shift_front <= self.config_global['recordings']['fs']//2:
+                                    if shift_front == shift_end and shift_front < fs:
+                                        if shift_front <= fs//2:
                                             if shift_front > 0:
                                                 new_data = new_snapshot[-shift_front:, :]
                                                 with self.lock_live_plot_data:

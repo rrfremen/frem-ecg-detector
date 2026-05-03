@@ -20,7 +20,7 @@ class DefaultPreprocessor(BasePreprocessor):
         self.prev_sample = 0
 
     def set_config(self, config: dict):
-        self.fs = config.get('recordings', {}).get('fs', 1)
+        self.fs = config.get('extractor', {}).get('fs', 1)
         self.low_pass = config.get('preprocessor', {}).get('params', {}).get('bandpass_low', 9)
         self.high_pass = config.get('preprocessor', {}).get('params', {}).get('bandpass_high', 14)
         self.moving_avg_window = config.get('preprocessor', {}).get('params', {}).get('avg_window', 40)

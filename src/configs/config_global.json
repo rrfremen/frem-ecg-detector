@@ -1,10 +1,6 @@
 {
   "recordings": {
-    "paths": [],
-    "sig_name": [],
-    "channels_in_use": ["MLII"],
-    "fs": 0,
-    "units": []
+
   },
   "extractor": {
     "active": "",
@@ -12,7 +8,6 @@
       "active_path": "",
       "active_channel": ""
     },
-    "recording_paths": [],
     "fs": 0
   },
   "preprocessor": {

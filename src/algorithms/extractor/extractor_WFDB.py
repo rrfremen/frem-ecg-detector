@@ -1,3 +1,6 @@
+# built-in
+from pathlib import Path
+
 # external
 import wfdb
 
@@ -46,3 +49,19 @@ class WFDBExtractor(BaseExtractor):
         channel_index = self.recording.sig_name.index(self.channel) if self.channel in self.recording.sig_name else 0
         self.raw_signal = self.recording.p_signal[:, channel_index]
 
+    # external functions (non-pipeline usage)
+    @staticmethod
+    def extract_metadata_from_file(current_path: str) -> tuple[list, int, list]:
+        if Path(current_path + '.hea').exists():  # faster with header only
+            current_header = wfdb.rdheader(current_path)
+        else:
+            current_header = wfdb.rdrecord(current_path)
+
+        return current_header.sig_name, current_header.fs, current_header.units
+
+    @staticmethod
+    def extract_signal_snippet(signal_path: str, fs: int, length: int, channel_index: int):
+        signal_raw = wfdb.rdsamp(signal_path)
+        signal = signal_raw[0][:length * fs, channel_index]
+
+        return signal, signal_raw[1]['sig_len']

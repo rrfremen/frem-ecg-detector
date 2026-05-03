@@ -6,10 +6,10 @@ from PySide6.QtWidgets import QWidget, QProgressBar
 from PySide6.QtCore import QTimer, Qt
 import pyqtgraph as pg
 import numpy as np
-import wfdb
 
-# private
+# internal
 from .gui.plotter_main_ui import Ui_Form
+from .algorithms.extractor.extractor_WFDB import WFDBExtractor
 
 
 class PlotterMainWidget(QWidget, Ui_Form):
@@ -80,7 +80,7 @@ class PlotterMainWidget(QWidget, Ui_Form):
         self.signal_plotters_bpm = plotter_main_vars['signal_plotters_bpm']
 
     def ring_buffer_setup(self):
-        self.ring_buffer_capacity = self.config_global['recordings']['fs'] * 60 * self.config_global['plotter']['buffer']['capacity']
+        self.ring_buffer_capacity = self.config_global['extractor']['fs'] * 60 * self.config_global['plotter']['buffer']['capacity']
         self.data_ring_buffer = np.zeros((self.ring_buffer_capacity, self.config_global['preprocessor']['shm']['shape'][1]), dtype=np.float64)
 
     def ring_buffer_update(self, data_from_pipeline):
@@ -146,15 +146,16 @@ class PlotterMainWidget(QWidget, Ui_Form):
 
     def update_first_plot(self):
         self.plot_upper.setVisible(True)
-        fs = self.config_global['recordings']['fs']
-        first_path = self.config_global['recordings']['paths'][0]
+        fs = self.config_global['extractor']['fs']
+        signal_path = self.config_global['extractor']['params']['active_path']
+        channel_selected = self.config_global['extractor']['params']['active_channel']
+        channel_index = self.config_global['recordings'][signal_path]['sig_name'].index(channel_selected)
 
-        signal_raw = wfdb.rdsamp(first_path)[0]
-        signal = signal_raw[:self.plot_window * fs, 0]
+        signal, max_len = WFDBExtractor.extract_signal_snippet(signal_path, fs, self.plot_window, channel_index)
         time_index = np.arange(len(signal)) / fs
 
         self.line_signal.setData(time_index, signal)
-        self.progress_widget.set_max(len(signal_raw))
+        self.progress_widget.set_max(max_len)
 
     def canvas_lower_plots_toggle(self, cmd):
         # TODO - update lower plot during pause
@@ -176,7 +177,7 @@ class PlotterMainWidget(QWidget, Ui_Form):
 
     # external functions
     def live_plot_update(self, data_ring_buffer, plotting_start):
-        fs = self.config_global['recordings']['fs']
+        fs = self.config_global['extractor']['fs']
         buffer_capacity = len(data_ring_buffer)
         window = self.plot_window * fs
 

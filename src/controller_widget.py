@@ -1,22 +1,21 @@
-# internal
+# built-in
 import os
 import glob
-from pathlib import Path
 
 # external
 from PySide6.QtWidgets import QWidget, QFileDialog, QStyle
-from PySide6.QtGui import QGuiApplication
 from PySide6.QtCore import Signal
-import wfdb
 
-# private
+# internal
 from .gui.controller_ui import Ui_Form
+from .algorithms.extractor.extractor_WFDB import WFDBExtractor
 
 
 class ControllerWidget(QWidget, Ui_Form):
     className = 'ControllerWidget'
 
     signal_display_recs = Signal()
+
     signal_live_plot_start = Signal()
     signal_live_plot_start_timer = Signal()
     signal_live_plot_pause = Signal()
@@ -67,6 +66,12 @@ class ControllerWidget(QWidget, Ui_Form):
         self.checkBox_darkMode.clicked.connect(
             lambda: self.signal_app_dark_mode.emit()
         )
+        self.listWidget_fileSelection.currentItemChanged.connect(
+            self.handle_file_selection_changed
+        )
+        self.listWidget_channelSelection.currentItemChanged.connect(
+            self.handle_channel_selection_changed
+        )
 
     def setup_ui_local(self):
         # switch button texts to symbols
@@ -74,28 +79,17 @@ class ControllerWidget(QWidget, Ui_Form):
         self.pushButton_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
         self.pushButton_stop.setText('')
         self.pushButton_stop.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
-        # grey out buttons first
+        # grey out stuff
         self.pushButton_start.setDisabled(True)
         self.pushButton_stop.setDisabled(True)
         self.pushButton_settings.setDisabled(True)
         self.checkBox_showProcessedSignal.setDisabled(True)
         self.checkBox_showDetector.setDisabled(True)
-
-    # def refresh_rate_init(self):
-    #     current_disp_refresh_rate = int(QGuiApplication.primaryScreen().refreshRate())
-    #     refresh_rates = []
-    #     if current_disp_refresh_rate >= 30:
-    #         refresh_rates.extend([30, 20, 10])
-    #     else:
-    #         refresh_rates.append(current_disp_refresh_rate)
-    #
-    #     self.comboBox_refreshRate.addItems([str(r) + ' Hz' for r in refresh_rates])
-    #     if 20 in refresh_rates:
-    #         index = refresh_rates.index(20)
-    #         self.comboBox_refreshRate.setCurrentIndex(index)
-    #
-    #     with self.lock_config_global:
-    #         self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
+        self.checkBox_showAnns.setDisabled(True)
+        self.listWidget_fileSelection.setDisabled(True)
+        self.label_fileSelection.setDisabled(True)
+        self.listWidget_channelSelection.setDisabled(True)
+        self.label_channelSelection.setDisabled(True)
 
     def preprocessor_init(self):
         # TODO - waiting UI update
@@ -106,10 +100,6 @@ class ControllerWidget(QWidget, Ui_Form):
         self.config_global['detector']['active'] = 'DefaultDetector'
 
     # UI functions
-    # def refresh_rate_update(self):
-    #     with self.lock_config_global:
-    #         self.config_global['plotter']['display']['refresh_rate'] = int(self.comboBox_refreshRate.currentText()[:-3])
-
     def select_file(self):
         selected_files = QFileDialog.getOpenFileNames(
             self,
@@ -155,59 +145,75 @@ class ControllerWidget(QWidget, Ui_Form):
             if not file_paths:
                 raise ValueError('No recording was found in the selected folder')
 
-        # check whether header file exists for the selected files
-        final_file_paths = []
-        relevant_headers = None
-        for current_path in file_paths:
-            current_path = current_path[:-4]
-            if Path(current_path + '.hea').exists():  # faster to extract header only
-                current_header = wfdb.rdheader(current_path)
-            else:
-                current_header = wfdb.rdrecord(current_path)
-            if relevant_headers is None:  # get reference for the files
-                relevant_headers = [
-                    current_header.sig_name,
-                    current_header.fs,
-                    current_header.units,
-                    current_header.samps_per_frame
-                ]
-                # insist on MLII for now
-                if len(self.config_global['recordings']['channels_in_use']) == 1:
-                    if self.config_global['recordings']['channels_in_use'][0] == 'MLII':
-                        if 'MLII' in current_header.sig_name:
-                            final_file_paths.append(current_path)
-                        else:
-                            break
-            else:  # compare all headers to the first header
-                current_relevant_headers = [
-                    current_header.sig_name,
-                    current_header.fs,
-                    current_header.samps_per_frame,
-                    current_header.units
-                ]
-                for i in range(len(relevant_headers)):
-                    if relevant_headers[i] != current_relevant_headers[i]:
-                        break
-                final_file_paths.append(current_path)
+        # TODO - allow multiple files
+        file_limit = 1
 
-        # update config - recordings
+        for i, current_path in enumerate(file_paths):
+            if i < file_limit:
+                current_path = current_path[:-4]
+                sig_name, fs, units = WFDBExtractor.extract_metadata_from_file(current_path)
+
+                with self.lock_config_global:
+                    self.config_global['recordings'][current_path] = {
+                        'sig_name': sig_name,
+                        'fs': fs,
+                        'units': units
+                    }
+
+        self.populate_file_selection()
+
+    def populate_file_selection(self):
+        # clear list widget
+        self.listWidget_fileSelection.clear()
+
+        # populate list widget for file selection and select the first one
+        file_paths = list(self.config_global['recordings'].keys())
+        self.listWidget_fileSelection.addItems(file_paths)
+        self.listWidget_fileSelection.setCurrentRow(0)
+
+        self.update_gui_file_selected()
+
+    def populate_channel_selection(self, current_path):
+        # clear list widget
+        self.listWidget_channelSelection.clear()
+        channels_avail = self.config_global['recordings'][current_path]['sig_name']
+        self.listWidget_channelSelection.addItems(channels_avail)
+
+    def handle_file_selection_changed(self, current, _):
+        current_path = current.text()
+        self.config_global['extractor']['active'] = 'WFDBExtractor'
+        self.config_global['extractor']['params']['active_path'] = current_path
+        self.config_global['extractor']['fs'] = self.config_global['recordings'][current_path]['fs']
+
+        self.populate_channel_selection(current_path)
+
+    def handle_channel_selection_changed(self, current, _):
         with self.lock_config_global:
-            self.config_global['recordings'].update({
-                'paths': final_file_paths,
-                'sig_name': relevant_headers[0],
-                'fs': relevant_headers[1],
-                'units': relevant_headers[2],
-            })
-            self.config_global['extractor']['active'] = 'WFDBExtractor'
-            self.config_global['extractor']['params']['active_path'] = final_file_paths[0]
-            self.config_global['extractor']['fs'] = relevant_headers[1]
-
+            self.config_global['extractor']['params']['active_channel'] = current.text()
         self.signal_display_recs.emit()
 
-    # Controller GUI functions - Only use from main_script for centralization
-    def update_gui_file_selection(self):
+    # Controller GUI functions
+    def update_gui_file_selected(self):
+        self.listWidget_fileSelection.setDisabled(False)
+        self.label_fileSelection.setDisabled(False)
+        self.listWidget_channelSelection.setDisabled(False)
+        self.label_channelSelection.setDisabled(False)
+
+    def update_gui_channel_selected(self):
         self.pushButton_start.setDisabled(False)
         self.pushButton_stop.setDisabled(False)
         self.pushButton_settings.setDisabled(False)
         self.checkBox_showProcessedSignal.setDisabled(False)
         self.checkBox_showDetector.setDisabled(False)
+
+    def update_gui_no_file_selected(self):
+        pass
+
+    def update_gui_no_channel_selected(self):
+        pass
+
+    def update_gui_live_plot_started(self):
+        pass
+
+    def update_gui_live_plot_stopped(self):
+        pass
