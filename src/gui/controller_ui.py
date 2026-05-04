@@ -66,15 +66,15 @@ class Ui_Form(object):
 
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.pushButton_selectFile = QPushButton(Form)
-        self.pushButton_selectFile.setObjectName(u"pushButton_selectFile")
+        self.pushButton_addFile = QPushButton(Form)
+        self.pushButton_addFile.setObjectName(u"pushButton_addFile")
 
-        self.horizontalLayout_2.addWidget(self.pushButton_selectFile)
+        self.horizontalLayout_2.addWidget(self.pushButton_addFile)
 
-        self.pushButton_clearSelection = QPushButton(Form)
-        self.pushButton_clearSelection.setObjectName(u"pushButton_clearSelection")
+        self.pushButton_removeFile = QPushButton(Form)
+        self.pushButton_removeFile.setObjectName(u"pushButton_removeFile")
 
-        self.horizontalLayout_2.addWidget(self.pushButton_clearSelection)
+        self.horizontalLayout_2.addWidget(self.pushButton_removeFile)
 
 
         self.verticalLayout_5.addLayout(self.horizontalLayout_2)
@@ -182,8 +182,8 @@ class Ui_Form(object):
     def retranslateUi(self, Form):
         Form.setWindowTitle(QCoreApplication.translate("Form", u"Form", None))
         self.label_fileSelection.setText(QCoreApplication.translate("Form", u"File Selection", None))
-        self.pushButton_selectFile.setText(QCoreApplication.translate("Form", u"Select File", None))
-        self.pushButton_clearSelection.setText(QCoreApplication.translate("Form", u"Clear File", None))
+        self.pushButton_addFile.setText(QCoreApplication.translate("Form", u"Add Files", None))
+        self.pushButton_removeFile.setText(QCoreApplication.translate("Form", u"Remove File", None))
         self.label_channelSelection.setText(QCoreApplication.translate("Form", u"Channel Selection", None))
         self.pushButton_start.setText(QCoreApplication.translate("Form", u"Start", None))
         self.pushButton_stop.setText(QCoreApplication.translate("Form", u"Stop", None))

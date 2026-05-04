@@ -67,16 +67,16 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
-          <widget class="QPushButton" name="pushButton_selectFile">
+          <widget class="QPushButton" name="pushButton_addFile">
            <property name="text">
-            <string>Select File</string>
+            <string>Add Files</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_clearSelection">
+          <widget class="QPushButton" name="pushButton_removeFile">
            <property name="text">
-            <string>Clear File</string>
+            <string>Remove File</string>
            </property>
           </widget>
          </item>

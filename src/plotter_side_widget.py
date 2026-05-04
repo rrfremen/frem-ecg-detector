@@ -22,14 +22,17 @@ class PlotterSideWidget(QWidget, Ui_Form):
     def setup_signal(self, plotter_side_vars):
         self.signal_plotters_bpm = plotter_side_vars['signal_plotters_bpm']
 
-        self.signal_plotters_bpm.connect(self.update_bpm)
+        self.signal_plotters_bpm.connect(self.bpm_update)
 
-    def update_bpm(self, bpm):
+    def bpm_update(self, bpm):
         bpm = str(int(round(bpm)))
         self.label_bpm.setText(f'{bpm} BPM')
 
+    def bpm_reset(self):
+        self.label_bpm.setText(' BPM')
+
     # Side Plotter GUI Functions - Only use from main_Script for centralization
-    def update_gui_file_selection(self):
+    def update_gui_file_selected(self):
         file_selected = self.config_global['extractor']['params']['active_path']
         file_selected = Path(file_selected).name
         self.label_currentSource.setText(f'Source: {file_selected}.dat')

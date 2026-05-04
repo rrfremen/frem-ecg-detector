@@ -247,6 +247,29 @@ class PlotterMainWidget(QWidget, Ui_Form):
         # progress bar
         self.progress_widget.update_progress_plotter(segment[-1, 0])
 
+    def reset_all(self):
+        # Clear plot lines
+        self.line_signal.setData([], [])
+        self.line_processed.setData([], [])
+        self.line_detector.setData([], [])
+        self.circle_beat.setData([], [])
+
+        # Reset ring buffer
+        self.data_ring_buffer = []
+        self.buffer_index = 0
+
+        # Reset timer/index tracking
+        self.current_index_timer = 0
+        self.plot_prev_index = 0
+        self.plot_timer_last_time = time.time()
+
+        # Reset BPM
+        self.bpm_prev = 0
+
+        # Reset progress bars
+        self.progress_widget.set_max(1)
+        self.progress_widget.update_progress_buffer(0)
+        self.progress_widget.update_progress_plotter(0)
 
 class OverlayProgressWidget(QWidget):
     def __init__(self, parent=None):

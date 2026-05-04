@@ -109,13 +109,19 @@ class MainWindow(QMainWindow):
         # self.setWindowIcon(QIcon.fromTheme('path'))
 
     def setup_signal_from_controller(self):
-        self.controller.signal_display_recs.connect(self.display_recs)
+        # gui
+        self.controller.signal_app_dark_mode.connect(self.app_set_theme)
+        self.controller.signal_gui_file_selected.connect(self.handle_file_selected)
+        self.controller.signal_gui_file_cleared.connect(self.handle_file_cleared)
+        self.controller.signal_gui_channel_selected.connect(self.handle_channel_selected)
+        self.controller.signal_gui_channel_cleared.connect(self.handle_channel_cleared)
+
+        # plotter functions
         self.controller.signal_live_plot_start.connect(self.live_plot_start)
         self.controller.signal_live_plot_pause.connect(self.live_plot_pause)
         self.controller.signal_live_plot_stop.connect(self.live_plot_stop)
         self.controller.signal_plot_lower_processed.connect(self.plot_lower_processed_toggle)
         self.controller.signal_plot_lower_detector.connect(self.plot_lower_detector_toggle)
-        self.controller.signal_app_dark_mode.connect(self.app_set_theme)
 
         self.signal_live_plot_start_timer.connect(self.live_plot_start_timer)
         self.config_global['plotter']['display'].watch('refresh_rate', self.refresh_rate_update)
@@ -134,10 +140,19 @@ class MainWindow(QMainWindow):
             self.plotter_main.set_dark_mode()
             self.dark_mode = True
 
-    def display_recs(self):
+    def handle_file_selected(self):
+        self.controller.update_gui_file_selected()
+        self.plotter_side.update_gui_file_selected()
+
+    def handle_file_cleared(self):
+        self.controller.update_gui_file_cleared()
+
+    def handle_channel_selected(self):
         self.controller.update_gui_channel_selected()
-        self.plotter_side.update_gui_file_selection()
         self.plotter_main.update_first_plot()
+
+    def handle_channel_cleared(self):
+        self.plotter_main.reset_all()
 
     def plot_lower_processed_toggle(self):
         self.plotter_main.canvas_lower_plots_toggle('processed')
@@ -156,6 +171,7 @@ class MainWindow(QMainWindow):
                 target=self.worker_start_live_plot,
             )
             thread_worker_start_live_plot.start()
+        self.controller.update_gui_live_plot_started()
 
     def live_plot_start_timer(self):
         self.timer_main_plotter.setInterval(
@@ -180,6 +196,7 @@ class MainWindow(QMainWindow):
         self.pipe_processing.send('Stop')
         self.event_live_plot.clear()
         self.timer_main_plotter.stop()
+        self.controller.update_gui_live_plot_stopped()
 
     def refresh_rate_update(self, key, value):
         self.timer_main_plotter.setInterval(int(1000/value))
