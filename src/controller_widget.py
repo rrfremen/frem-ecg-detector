@@ -138,6 +138,8 @@ class ControllerWidget(QWidget, Ui_Form):
             self.config_global['extractor']['params']['active_path'] = current_path
             self.config_global['extractor']['fs'] = self.config_global['recordings'][current_path]['fs']
 
+            self.signal_gui_file_selected.emit()
+
         self.populate_channel_selection(current)
 
     def handle_channel_selection_changed(self, current, _):
@@ -230,6 +232,13 @@ class ControllerWidget(QWidget, Ui_Form):
         self.label_fileSelection.setDisabled(True)
         self.listWidget_channelSelection.setDisabled(True)
         self.label_channelSelection.setDisabled(True)
+
+    def update_gui_channel_cleared(self):
+        self.pushButton_start.setDisabled(True)
+        self.pushButton_stop.setDisabled(True)
+        self.pushButton_settings.setDisabled(True)
+        self.checkBox_showProcessedSignal.setDisabled(True)
+        self.checkBox_showDetector.setDisabled(True)
 
     def update_gui_live_plot_started(self):
         self.pushButton_addFile.setDisabled(True)

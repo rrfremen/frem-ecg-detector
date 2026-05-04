@@ -4,7 +4,7 @@ from pathlib import Path
 # external
 from PySide6.QtWidgets import QWidget
 
-# private
+# internal
 from .gui.plotter_side_ui import Ui_Form
 
 
@@ -34,5 +34,5 @@ class PlotterSideWidget(QWidget, Ui_Form):
     # Side Plotter GUI Functions - Only use from main_Script for centralization
     def update_gui_file_selected(self):
         file_selected = self.config_global['extractor']['params']['active_path']
-        file_selected = Path(file_selected).name
+        file_selected = Path(file_selected).name if file_selected else ''
         self.label_currentSource.setText(f'Source: {file_selected}.dat')

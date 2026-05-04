@@ -82,7 +82,6 @@ class ProcessingPipeline:
 
     def run(self, pipe_processing):
         process_running, process_paused = True, False
-        print('starting processing pipeline')
 
         # windows and indexes
         sample_index = 0
@@ -102,7 +101,6 @@ class ProcessingPipeline:
         shm_ver[0] = 0  # initialize version
 
         pipe_processing.send('shm_attached')  # send handshake confirmation
-        print('sent handshake to main process')
 
         while process_running:
             # check for any command from GUI

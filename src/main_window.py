@@ -146,12 +146,14 @@ class MainWindow(QMainWindow):
 
     def handle_file_cleared(self):
         self.controller.update_gui_file_cleared()
+        self.plotter_side.update_gui_file_selected()
 
     def handle_channel_selected(self):
         self.controller.update_gui_channel_selected()
         self.plotter_main.update_first_plot()
 
     def handle_channel_cleared(self):
+        self.controller.update_gui_channel_cleared()
         self.plotter_main.reset_all()
 
     def plot_lower_processed_toggle(self):
@@ -197,6 +199,8 @@ class MainWindow(QMainWindow):
         self.event_live_plot.clear()
         self.timer_main_plotter.stop()
         self.controller.update_gui_live_plot_stopped()
+        self.plotter_main.reset_all()
+        self.plotter_main.update_first_plot()
 
     def refresh_rate_update(self, key, value):
         self.timer_main_plotter.setInterval(int(1000/value))
@@ -318,6 +322,8 @@ class MainWindow(QMainWindow):
                             print('wrong version, trying again')
                     elif msg == 'pipeline_finished_and_paused':
                         self.logger.info('Pipeline listener on hold')
+                    elif msg == 'pipeline_closed':
+                        break
                 elif msg is None:  # close the pipe
                     self.event_live_plot.clear()
                     pipe_plotting.close()
@@ -327,3 +333,4 @@ class MainWindow(QMainWindow):
             except EOFError:
                 # print('WARNING - processing pipe was closed unexpectedly')
                 break
+        print('pipeline listener closed')
