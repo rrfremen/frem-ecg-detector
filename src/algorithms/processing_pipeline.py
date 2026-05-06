@@ -14,6 +14,7 @@ from .preprocessor.preprocessor_base import BasePreprocessor
 from . import preprocessor as preprocessor_pkg
 from .extractor.extractor_base import BaseExtractor
 from . import extractor as extractor_pkg
+from .math_utils import ms_to_fs
 
 
 class ProcessingPipeline:
@@ -22,28 +23,24 @@ class ProcessingPipeline:
         self.config_local = {}
         self.fs = self.config_global['extractor']['fs']
 
-        # initiate extractor
+        self.default_modules = {
+            'extractor': 'WFDBExtractor',
+            'preprocessor': 'DefaultPreprocessor',
+            'detector': 'DefaultDetector'
+        }
+
+        # get available modules
         self.avail_extractors = self.get_available_modules('extractor', extractor_pkg, BaseExtractor)
-        extractor_name = config.get('extractor', {}).get('active') or 'WFDBExtractor'
-        self.extractor = self.avail_extractors.get(extractor_name, self.avail_extractors['WFDBExtractor'])()
-        self.extractor.set_config(config)
-
-        # initiate preprocessor
         self.avail_preprocessors = self.get_available_modules('preprocessor', preprocessor_pkg, BasePreprocessor)
-        preprocessor_name = config.get('preprocessor', {}).get('active') or 'DefaultPreprocessor'
-        self.preprocessor = self.avail_preprocessors.get(preprocessor_name, self.avail_preprocessors['DefaultPreprocessor'])()
-        self.preprocessor.set_config(config=config)
-
-        # initiate detector
         self.avail_detectors = self.get_available_modules('detector', detector_pkg, BaseDetector)
-        detector_name = config.get('detector', {}).get('active') or 'DefaultDetector'
-        self.detector = self.avail_detectors.get(detector_name, self.avail_detectors['DefaultDetector'])()
-        self.detector.set_config(config=config)
+
+        self.extractor, self.preprocessor, self.detector = None, None, None
 
         # bpm calculation
         self.beat_calculation_window = 5
         self.beat_timestamps = deque(maxlen=self.beat_calculation_window)
 
+    # noinspection PyMethodMayBeStatic
     def get_available_modules(self, class_name, pkg, base_class):
         available = {}
         for _, module_name, _ in pkgutil.iter_modules(pkg.__path__):
@@ -54,6 +51,12 @@ class ProcessingPipeline:
                 if isinstance(obj, type) and issubclass(obj, base_class) and obj is not base_class:
                     available[name] = obj
         return available
+
+    def assign_module(self, module_type, module_avails):
+        module_name = self.config_global.get(module_type, {}).get('active') or self.default_modules[module_type]
+        module = module_avails.get(module_name, module_avails[self.default_modules[module_type]])()
+        module.set_config(self.config_global)
+        setattr(self, module_type, module)
 
     def get_shm(self):
         shm_raw = shared_memory.SharedMemory(name=self.config_global['preprocessor']['shm']['name'], create=False)
@@ -81,40 +84,61 @@ class ProcessingPipeline:
         return 60/avg_interval
 
     def run(self, pipe_processing):
-        process_running, process_paused = True, False
+        process_running, process_paused = False, False
 
-        # windows and indexes
-        sample_index = 0
-        batch_index, batch_window = 0, int(self.fs / self.config_global['preprocessor']['batch_window'])  # 20 ms batch
+        # None initialization to suppress unbounded local variables warnings
+        shm_raw, shm_ver, shm_arr, result_holder = None, None, None, None
+        index_dq, signal_dq, signal_processed_dq = None, None, None
+        detector_dq, beat_location_dq, bpm_dq = None, None, None
+        sample_index, batch_index, batch_window = 0, 0, 0
 
-        # data holder
-        index_dq = deque([0] * self.fs, maxlen=self.fs)
-        signal_dq = deque([0] * self.fs, maxlen=self.fs)
-        signal_processed_dq = deque([0] * self.fs, maxlen=self.fs)
-        detector_dq = deque([0] * self.fs, maxlen=self.fs)
-        beat_location_dq = deque([0] * self.fs, maxlen=self.fs)
-        bpm_dq = deque([0] * self.fs, maxlen=self.fs)
-        result_holder = np.zeros(self.config_global['preprocessor']['shm']['shape'])
+        # noinspection PyBroadException
+        try:
+            result_holder = np.zeros(self.config_global['preprocessor']['shm']['shape'])
 
-        # shared memory assignments
-        shm_raw, shm_ver, shm_arr = self.get_shm()
-        shm_ver[0] = 0  # initialize version
+            # shared memory assignments
+            shm_raw, shm_ver, shm_arr = self.get_shm()
+            shm_ver[0] = 0  # initialize version
 
-        pipe_processing.send('shm_attached')  # send handshake confirmation
+            # assign modules
+            self.assign_module('extractor', self.avail_extractors)
+            self.assign_module('preprocessor', self.avail_preprocessors)
+            self.assign_module('detector', self.avail_detectors)
+
+            process_running = True
+        except Exception:
+            pipe_processing.send('pipeline_failed_start')
+
+        if process_running:
+            # windows and indexes
+            sample_index = 0
+            batch_index = 0
+            batch_window = ms_to_fs(
+                self.fs,
+                self.config_global['preprocessor']['batch_window']
+            )
+
+            # data holder
+            index_dq = deque([0] * self.fs, maxlen=self.fs)
+            signal_dq = deque([0] * self.fs, maxlen=self.fs)
+            signal_processed_dq = deque([0] * self.fs, maxlen=self.fs)
+            detector_dq = deque([0] * self.fs, maxlen=self.fs)
+            beat_location_dq = deque([0] * self.fs, maxlen=self.fs)
+            bpm_dq = deque([0] * self.fs, maxlen=self.fs)
+            pipe_processing.send('pipeline_starting')  # send handshake confirmation
 
         while process_running:
             # check for any command from GUI
             if pipe_processing.poll() and not process_paused:
                 signal_from_gui = pipe_processing.recv()
-                if type(signal_from_gui) == str:
+                if isinstance(signal_from_gui, str):
                     if signal_from_gui == 'Pause':
                         process_paused = True
                     elif signal_from_gui == 'Stop':
                         break
             elif process_paused:  # block the loop if paused
-                print('pipeline on pause')
                 signal_from_gui = pipe_processing.recv()
-                if type(signal_from_gui) == str:
+                if isinstance(signal_from_gui, str):
                     if signal_from_gui == 'Continue':
                         process_paused = False
                     elif signal_from_gui == 'Stop':

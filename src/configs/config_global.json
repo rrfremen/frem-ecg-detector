@@ -17,7 +17,7 @@
       "bandpass_high": 14,
       "avg_window": 40
     },
-    "batch_window": 20,
+    "batch_window": 40,
     "shm": {
       "name": "ecg-shm",
       "shape": 0,

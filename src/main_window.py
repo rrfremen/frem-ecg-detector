@@ -257,12 +257,12 @@ class MainWindow(QMainWindow):
 
         # unlink shared memory directly now to avoid orphaned memory later
         processing_handshake = self.pipe_processing.recv()
-        if processing_handshake == 'shm_attached':
+        if processing_handshake == 'pipeline_starting':
             shm_raw.unlink()
             self.event_live_plot.set()
             self.signal_live_plot_start_timer.emit()
             self.logger.info('SHM handshake from processing pipeline confirmed')
-        elif processing_handshake == 'failed_start':
+        elif processing_handshake == 'pipeline_failed_start':
             self.event_live_plot_failed.set()
         else:
             raise ValueError('processing pipeline gave no handshake')
