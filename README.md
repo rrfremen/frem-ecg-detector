@@ -26,7 +26,7 @@ the signal source.
 The project works with two processes, one spawned automatically by the GUI
 and generally handles the Graphic User Interface (GUI)-side of the application, 
 and the other is spawned only when the processing pipeline is activated. This 
-process separation serves to bypass Python's GIL (Global Interpreter Lock) and 
+process separation serves to bypass Python's Global Interpreter Lock (GIL) and 
 have the heavier workload in pipeline to be independent of the processes in the 
 GUI. Bypassing Python's GIL also means the GUI not having to wait for its turn
 to continue its UI functions.

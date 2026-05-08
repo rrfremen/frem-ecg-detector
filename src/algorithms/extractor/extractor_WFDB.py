@@ -23,8 +23,8 @@ class WFDBExtractor(BaseExtractor):
 
     # live extractor functions
     def set_config(self, config: dict):
-        self.recording_path = config['extractor'].get('params', {}).get('active_path', "")
-        self.channel = config['extractor'].get('params', {}).get('active_channel', 0)
+        self.recording_path = config.get('extractor', {}).get('params', {}).get('active_path', "")
+        self.channel = config.get('extractor', {}).get('params', {}).get('active_channel', 0)
 
         self.extract_recording()
 

@@ -21,7 +21,7 @@ class ProcessingPipeline:
     def __init__(self, config:dict):
         self.config_global = config
         self.config_local = {}
-        self.fs = self.config_global['extractor']['fs']
+        self.fs = 0
 
         self.default_modules = {
             'extractor': 'WFDBExtractor',
@@ -94,6 +94,8 @@ class ProcessingPipeline:
 
         # noinspection PyBroadException
         try:
+            self.fs = self.config_global['extractor']['fs']
+
             result_holder = np.zeros(self.config_global['preprocessor']['shm']['shape'])
 
             # shared memory assignments
